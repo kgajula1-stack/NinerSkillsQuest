@@ -1,0 +1,60 @@
+@startuml
+title Niner Skills Quest - provisional Sprint 2 domain model
+
+class Student {
+  id
+}
+
+class Course {
+  id
+  code
+  title
+}
+
+class Skill {
+  id
+  name
+}
+
+class CareerRoadmap {
+  id
+  name
+  description
+}
+
+class EmployerProfile {
+  id
+  name
+  location
+  industry
+}
+
+class StudentCourse {
+  studentId
+  courseId
+}
+
+class StudentCareerGoal {
+  studentId
+  roadmapId
+  employerId
+}
+
+class Recommendation {
+  skillId
+  type
+  title
+  url
+}
+
+Student "1" -- "0..*" StudentCourse
+Course "1" -- "0..*" StudentCourse
+Course "0..*" -- "0..*" Skill
+Student "1" -- "0..1" StudentCareerGoal
+CareerRoadmap "1" -- "0..*" StudentCareerGoal
+EmployerProfile "1" -- "0..*" StudentCareerGoal
+Skill "1" -- "0..*" Recommendation
+
+note "Provisional only: catalog ownership, skill join tables, and account identity require team review." as N1
+N1 .. Student
+@enduml

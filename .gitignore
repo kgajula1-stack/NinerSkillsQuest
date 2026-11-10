@@ -1,3 +1,17 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Private keys
+*.pem
+*.key
