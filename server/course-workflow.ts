@@ -22,6 +22,8 @@ export async function saveCourses(db: PrismaClient, courseIds: string[]): Promis
     if (!student) {
       throw new Error("Sample student not found. Run npm run db:seed.");
     }
+    // Serialize whole-list saves for the sample student under PostgreSQL.
+    await tx.$queryRaw`SELECT id FROM students WHERE id = ${DEMO_STUDENT_ID}::uuid FOR UPDATE`;
     const available = await tx.course.findMany({
       where: { id: { in: courseIds }, isActive: true },
       select: { id: true },
@@ -50,7 +52,7 @@ export async function saveCourses(db: PrismaClient, courseIds: string[]): Promis
     for (const courseId of courseIds) {
       await tx.studentCourse.upsert({
         where: { studentId_courseId: { studentId: DEMO_STUDENT_ID, courseId } },
-        create: { studentId: DEMO_STUDENT_ID, courseId, status: "COMPLETED" },
+        create: { studentId: DEMO_STUDENT_ID, courseId, status: "COMPLETED", completedAt: new Date() },
         update: {},
       });
     }

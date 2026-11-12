@@ -1,28 +1,36 @@
 @startuml
-title Niner Skills Quest - provisional completed-course persistence flow
-
+title Completed-course persistence (PostgreSQL / Prisma 6)
 actor Student
-boundary "Course entry UI" as UI
-control "Application state/service" as Service
-database "Data-access layer" as Repository
-database "Development database" as DB
-
-Student -> UI: Search and select a supported course
-UI -> Service: Request course selection
-Service -> Service: Validate course ID and duplicate state
-alt Invalid or duplicate course
-  Service --> UI: Recoverable validation error
+boundary "Course UI" as UI
+control "Loopback API" as API
+control "Prisma workflow" as Workflow
+database PostgreSQL as DB
+Student -> UI: Save courses to database
+UI -> API: PUT /api/demo/courses {courseIds}
+API -> API: Validate unique IDs and request
+API -> Workflow: saveCourses(shared sample student)
+Workflow -> DB: Begin transaction; lock student row
+Workflow -> DB: Validate active courses and workflow ownership
+alt Invalid selection
+  Workflow -> DB: Roll back
+  Workflow --> API: InvalidCoursesError
+  API --> UI: 400 with recoverable error
 else Valid selection
-  Service -> Repository: Save student-course selection
-  Repository -> DB: Insert or update record
-  DB --> Repository: Persisted record
-  Repository --> Service: Saved selection
-  Service --> UI: Refresh courses and mapped skills
-  UI --> Student: Show saved course and skills
+  Workflow -> DB: Remove deselected manual courses; upsert selected
+  Workflow -> DB: Commit
+  API -> Workflow: readCourses()
+  Workflow -> DB: Read manual completed courses
+  Workflow --> API: Saved IDs
+  API --> UI: 200 {courseIds}
 end
-
-note over Service,DB
-The database, ORM, identity model, and API boundary
-are not selected yet.
+Student -> UI: Load courses after API restart
+UI -> API: GET /api/demo/courses
+API -> Workflow: readCourses()
+Workflow -> DB: Query shared sample student's saved courses
+Workflow --> API: Persisted IDs
+API --> UI: Replace local selection
+note over API,DB
+Database errors return 500 and are displayed by the UI.
+No authentication; local sample workflow only.
 end note
 @enduml

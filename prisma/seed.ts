@@ -10,7 +10,7 @@ if (!url) {
 const db = createDatabase(url);
 try {
   await seedDatabase(db);
-  console.log("Seeded sample student, courses, skills, and course mappings.");
+  console.log("Seeded sample student, courses, skills, roadmaps, employers, recommendations, and mappings.");
 } finally {
   await db.$disconnect();
 }

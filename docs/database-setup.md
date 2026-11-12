@@ -1,63 +1,448 @@
 # Sprint 2 database setup plan
 
-## Current status
+## Current implementation
 
-Sprint 2 database work has not started. The project currently uses Vite,
-vanilla TypeScript, browser `localStorage`, and illustrative in-memory catalog
-data. No database provider or ORM has been selected yet.
+PostgreSQL and Prisma 6.19.0 are configured. The local Node API explicitly
+saves and loads manual completed-course selections through Prisma. Career goals
+remain in browser storage; the schema supports future goal persistence.
+The frontend continues to work locally without the API until database buttons
+are used. All API requests use a fictional shared sample student, not an
+authenticated account. Skill display still derives from the browser catalog.
 
-Do not add real credentials to this repository. Use `.env.example` as the
-template for a future local configuration.
+## Selected persistence scope
 
-## Existing data that may require persistence
+### Persisted reference data
 
-The current issues and implementation identify these application concepts:
+- Courses
+- Skills
+- Course-to-skill mappings
+- Career roadmaps
+- Roadmap-to-skill mappings
+- Employers
+- Learning recommendations
 
-- Completed courses selected by a student.
-- Course-to-skill mappings.
-- A selected career roadmap.
-- A selected Charlotte employer profile.
-- The resulting target skill profile.
-- Learning recommendations for an unrecorded target skill.
-- A local demo session, which is explicitly not real authentication.
+These records are seeded from the existing files in `src/data/`.
 
-The catalog, roadmap, employer, skill, and recommendation records are
-illustrative application data. The team still needs to decide which of these
-are database records and which remain seeded reference data.
+### Persisted student data
 
-## Decisions still required
+- Student profile
+- Completed course selections
+- Current career goal
 
-Before generating ORM files or migrations, the team must decide:
+### Derived data
 
-1. Database technology and local development workflow.
-2. ORM or SDK.
-3. Whether a backend/API layer is required for the Vite frontend.
-4. Which records belong to a student account.
-5. Whether the shared development environment uses one database or matching
-   local databases.
-6. Seed data and migration ownership.
+The application will calculate current skills, matched target skills,
+unmatched target skills, and the target skill profile from persisted
+relationships. These values will not be stored separately, which avoids
+duplicating data that can become inconsistent.
 
-## Planned verification
+### Session-only data
 
-After the database choice is approved, each team member will document:
+Search text, draft course selection, selected recommendation UI state,
+accessibility announcements, temporary messages, and the local demo sign-in
+state are not database entities. The demo sign-in is not real authentication.
+
+## Entity and attribute model
+
+### Student
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID or stable string | Primary key |
+| `email` | string | Required and unique |
+| `displayName` | string | Required |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+Real authentication is outside the current sprint scope. This entity provides
+ownership for persisted student data.
+
+### Course
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | stable string or UUID | Primary key |
+| `code` | string | Required and unique |
+| `title` | string | Required |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+### Skill
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | stable string or UUID | Primary key |
+| `name` | string | Required and unique |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+### CourseSkill
+
+This join entity maps courses to skills. Its composite primary key is
+`(courseId, skillId)`, preventing duplicate mappings.
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `courseId` | foreign key | References `Course` |
+| `skillId` | foreign key | References `Skill` |
+
+### StudentCourse
+
+This join entity records courses completed by a student. Its composite primary
+key is `(studentId, courseId)`, preventing duplicate selections.
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `studentId` | foreign key | References `Student` |
+| `courseId` | foreign key | References `Course` |
+| `completedAt` | datetime | Required |
+| `createdAt` | datetime | Required |
+
+### CareerRoadmap
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | stable string or UUID | Primary key |
+| `name` | string | Required and unique |
+| `description` | string | Required |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+### RoadmapSkill
+
+This join entity maps target skills to a career roadmap. Its composite primary
+key is `(roadmapId, skillId)`.
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `roadmapId` | foreign key | References `CareerRoadmap` |
+| `skillId` | foreign key | References `Skill` |
+
+### Employer
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | stable string or UUID | Primary key |
+| `name` | string | Required |
+| `location` | string | Required |
+| `industry` | string | Required |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+Employer records are illustrative demo data, not verified endorsements or
+hiring requirements.
+
+### StudentCareerGoal
+
+Each student has at most one active goal in the current UI. Therefore,
+`studentId` is the primary key for this entity.
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `studentId` | foreign key | Primary key; references `Student` |
+| `roadmapId` | foreign key | References `CareerRoadmap` |
+| `employerId` | foreign key | References `Employer` |
+| `createdAt` | datetime | Required |
+| `updatedAt` | datetime | Required |
+
+Goal history is out of scope. A future version can add a separate goal ID and
+an active/ended status if historical goals become necessary.
+
+### Recommendation
+
+| Attribute | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID or stable string | Primary key |
+| `skillId` | foreign key | References `Skill` |
+| `title` | string | Required |
+| `url` | string | Required |
+| `type` | string or enum | Required |
+| `createdAt` | datetime | Required |
+
+Recommendation types currently represent electives and practice resources.
+
+## Relationships
+
+```text
+Student 1 ──── 0..* StudentCourse 0..* ──── 1 Course
+Course 1 ──── 0..* CourseSkill 0..* ──── 1 Skill
+CareerRoadmap 1 ──── 0..* RoadmapSkill 0..* ──── 1 Skill
+Student 1 ──── 0..1 StudentCareerGoal
+CareerRoadmap 1 ──── 0..* StudentCareerGoal
+Employer 1 ──── 0..* StudentCareerGoal
+Skill 1 ──── 0..* Recommendation
+```
+
+## Current data-to-entity mapping
+
+| Existing source | Persistence destination |
+| --- | --- |
+| `skills[]` in `src/data/catalog.ts` | `Skill` |
+| `courses[]` in `src/data/catalog.ts` | `Course` |
+| `course.skillIds[]` | `CourseSkill` |
+| `careerRoadmaps[]` in `src/data/careerGoals.ts` | `CareerRoadmap` |
+| `roadmap.skillIds[]` | `RoadmapSkill` |
+| `employerProfiles[]` in `src/data/careerGoals.ts` | `Employer` |
+| Recommendation data in `src/data/recommendations.ts` | `Recommendation` |
+| `completedCourseIds` in `courseSelectionStore.ts` | `StudentCourse` |
+| Selected roadmap and employer IDs | `StudentCareerGoal` |
+| `targetProfile` and skill comparison results | Derived query results |
+
+Stable IDs already used by the catalog, such as `backend-developer`, should
+remain unchanged when the seed data is created.
+
+## Integrity and deletion rules
+
+- Deleting a student cascades to that student's `StudentCourse` and
+  `StudentCareerGoal` records.
+- Deleting a course, skill, roadmap, or employer is restricted when dependent
+  records exist.
+- Course-skill and roadmap-skill mappings may be changed only as intentional
+  catalog maintenance.
+- Reference records should normally be updated or retired rather than
+  casually deleted.
+- Foreign keys and unique constraints must be enforced by the database, not
+  only by the UI.
+
+## First database-integrated user story
+
+> As a student, I want to save completed courses so that my selected courses
+> and mapped skills remain available after restarting the application.
+
+Acceptance criteria:
+
+1. A valid course can be saved for a student.
+2. The selection is stored in `StudentCourse`.
+3. A duplicate course cannot be selected twice for the same student.
+4. Saved courses can be retrieved after restarting the application.
+5. Course skills are loaded through `CourseSkill`.
+6. Removing a course changes only that student's selection.
+7. An unknown course ID is rejected.
+8. Database failures produce a visible error message.
+
+## Team verification table
+
+Each teammate must run the workflow and record their actual result below. Do not include
+credentials or private connection strings.
 
 | Team member | Operation | Result |
 | --- | --- | --- |
-| To be completed | Connect and create a test record | Pending |
-| To be completed | Retrieve the test record | Pending |
-| To be completed | Update or remove a test record | Pending |
+| To be completed | Create a test course selection | Pending |
+| To be completed | Retrieve a saved selection | Pending |
+| To be completed | Update or remove a selection | Pending |
 
-Credentials and private connection details must not be included in this
-table.
+## Database choice
 
-## Planned commands
+The team selected PostgreSQL with Prisma because the application has normalized
+relationships between students, courses, skills, roadmaps, employers, and
+recommendations. PostgreSQL provides foreign keys and composite constraints,
+while Prisma provides typed access, migration files, and a reproducible seed
+workflow.
 
-The final database commands will be added after the team selects the database
-and data-access technology. Until then, the current application remains
-verified with:
+Each developer should run PostgreSQL locally or through Docker. A shared
+development database may be configured later, but credentials must remain in a
+local `.env` file and never in Git.
 
-```text
+## Teammate installation and local setup
+
+These steps create the same database structure and seed data on each
+teammate's computer. They do not give a teammate access to the PostgreSQL
+server running on another computer.
+
+### 1. Install prerequisites
+
+Install Node.js 22.12 or newer, Git, and PostgreSQL 17. On Windows,
+PostgreSQL can be installed with:
+
+```powershell
+winget install --id PostgreSQL.PostgreSQL.17 --exact `
+  --accept-package-agreements --accept-source-agreements
+```
+
+During PostgreSQL installation, each teammate must choose and remember a local
+password for the `postgres` user. The password may be different on each
+computer.
+
+Confirm that the PostgreSQL service is running:
+
+```powershell
+Get-Service -Name postgresql-x64-17
+```
+
+Confirm the command-line client is available:
+
+```powershell
+psql --version
+```
+
+### 2. Clone and install the project
+
+```powershell
+git clone https://github.com/kgajula1-stack/NinerSkillsQuest.git
+cd NinerSkillsQuest
 npm install
-npm test
+```
+
+### 3. Create a local database
+
+Set `PGPASSWORD` only for the current PowerShell session and replace the
+placeholder with the password selected during PostgreSQL installation:
+
+```powershell
+$env:PGPASSWORD="your-local-postgres-password"
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" `
+  -h localhost -U postgres -d postgres `
+  -c "CREATE DATABASE niner_skills_quest;"
+```
+
+If the database already exists, PostgreSQL will report that it exists; this is
+safe to ignore.
+
+### 4. Configure the local environment
+
+Copy `.env.example` to `.env` and replace the password placeholder:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The local file should contain a connection string in this format:
+
+```env
+DATABASE_URL="postgresql://postgres:your-local-postgres-password@localhost:5432/niner_skills_quest"
+```
+
+Never commit `.env`, paste its contents into an issue, or include it in a
+screenshot. Verify that Git ignores it:
+
+```powershell
+git check-ignore -v .env
+git ls-files .env
+```
+
+The first command should show the `.gitignore` rule. The second command should
+produce no output.
+
+### 5. Generate and initialize Prisma
+
+Run the following commands from the repository root:
+
+```powershell
+npm run db:generate
+npm run db:deploy
+npm run db:seed
 npm run build
 ```
+
+`npm run db:deploy` applies the committed Prisma migrations. The seed command
+loads the illustrative catalog, roadmap, employer, and recommendation data.
+The seed is repeatable and uses upserts for reference records.
+
+### 6. Verify access
+
+Check the database through the PostgreSQL CLI:
+
+```powershell
+$env:PGPASSWORD="your-local-postgres-password"
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" `
+  -h localhost -U postgres -d niner_skills_quest `
+  -c "\dt"
+```
+
+Or open Prisma Studio:
+
+```powershell
+npm run db:studio
+```
+
+Open [http://localhost:5555](http://localhost:5555), then stop Prisma Studio
+with `Ctrl+C` when finished.
+
+## Accessing the database built on another computer
+
+The current database is a local PostgreSQL instance on the owner's computer.
+`localhost` always means the computer running the command, so a teammate's
+`.env` cannot use `localhost` to reach this database.
+
+For normal team development, use one of these approaches:
+
+1. **Recommended:** create a shared no-cost development PostgreSQL database
+   through an approved provider, then share its connection details through a
+   secure channel. Each teammate uses the same committed migrations and seed
+   command.
+2. **Local-only development:** each teammate creates a local database by
+   following the setup above. This is appropriate until a shared development
+   server is approved.
+
+Do not expose a home computer's PostgreSQL port to the public internet. Do not
+commit a shared connection string, password, private key, or service-account
+credential. If the team later selects a shared provider, document only the
+provider, database name, non-secret variable names, and connection procedure
+here; distribute the actual secret separately.
+
+## Prisma workflow for schema changes
+
+When the schema changes:
+
+```powershell
+npm run db:migrate -- --name describe-your-change
+npm run db:generate
+npm run db:seed
+```
+
+Commit `prisma/schema.prisma` and the new `prisma/migrations/` directory.
+Teammates then pull the changes and run:
+
+```powershell
+npm install
+npm run db:generate
+npm run db:deploy
+npm run db:seed
+```
+
+Do not edit an existing migration that has already been applied. Create a new
+migration for each schema change.
+
+## Run and verify the course API
+
+Run `npm run db:server` and `npm run dev` in separate terminals.
+Open http://localhost:5173, select courses, and use **Save courses to database**.
+Restart the API and use **Load courses from database** to confirm persistence.
+Remove a course and save again; an empty list removes all manual selections.
+**Save and continue** continues to save only to browser storage.
+The seed also creates the sample student and never resets saved selections.
+Records from other students, in-progress courses, and transcript coursework
+are excluded from manual saves. The local API binds only to loopback.
+
+## PostgreSQL integration tests
+
+Create a separate disposable database named `niner_skills_quest_test` using
+PostgreSQL's `CREATE DATABASE niner_skills_quest_test;`, then set
+`TEST_DATABASE_URL` in `.env` using the template in `.env.example`.
+The role needs permission to create and drop schemas within that database.
+Run:
+
+```powershell
+npm run db:generate
+npm test
+npm run test:db
+npm run build
+```
+
+`npm test` runs browser tests without a database. `test:db` requires a separate
+PostgreSQL database whose name ends in `_test`; it rejects the application
+database. It creates a random schema, applies committed migrations, seeds it,
+and drops only that generated schema afterward. Tests cover seed repeatability,
+save/load/removal, API/client restart, invalid and duplicate IDs, and preserving
+other workflows and students. A failed migration is a test failure, not a skip.
+
+## Migrating from the earlier SQLite branch
+
+Keep main's `20261112200023_init` PostgreSQL migration unchanged. The new
+`20261112220000_manual_course_workflow` migration adds course availability and
+student-course status/source columns with defaults compatible with existing rows.
+Use `db:deploy` for both a new PostgreSQL database and one already initialized
+from main. SQLite migration files and the Prisma 7 adapter/config are removed.
+There is no automatic transfer of existing SQLite demo selections; keep a backup
+of that file and reselect/save the demo courses into PostgreSQL if needed.
+Never run PostgreSQL migrations against the old SQLite file.

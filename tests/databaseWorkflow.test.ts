@@ -1,8 +1,8 @@
+import "dotenv/config";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
 import type { PrismaClient } from "@prisma/client";
 import { courses, skills } from "../src/data/catalog";
@@ -10,22 +10,42 @@ import { seedDatabase } from "../prisma/seed-data";
 import { createDatabase, DEMO_STUDENT_ID } from "../server/database";
 import { createApiServer } from "../server/http";
 
-describe("SQLite completed-course workflow", () => {
-  let directory: string;
+describe("PostgreSQL completed-course workflow", () => {
+  const schema = `niner_test_${randomUUID().replaceAll("-", "")}`;
+  let cleanupUrl: string | undefined;
   let db: PrismaClient;
   let server: Server;
   let baseUrl: string;
   let url: string;
 
   beforeAll(async () => {
-    directory = mkdtempSync(join(tmpdir(), "niner-skills-test-"));
-    url = `file:${join(directory, "test.db")}`;
+    if (!process.env.TEST_DATABASE_URL) {
+      throw new Error("Set TEST_DATABASE_URL to a separate PostgreSQL database whose name ends in _test. See docs/database-setup.md.");
+    }
+    const target = new URL(process.env.TEST_DATABASE_URL);
+    if (!["postgres:", "postgresql:"].includes(target.protocol) || !target.pathname.endsWith("_test")) {
+      throw new Error("TEST_DATABASE_URL must point to a PostgreSQL database whose name ends in _test.");
+    }
+    if (process.env.DATABASE_URL) {
+      const application = new URL(process.env.DATABASE_URL);
+      if (target.hostname === application.hostname && (target.port || "5432") === (application.port || "5432") && target.pathname === application.pathname) {
+        throw new Error("TEST_DATABASE_URL must use a different database from DATABASE_URL.");
+      }
+    }
+    cleanupUrl = target.toString();
+    target.searchParams.set("schema", schema);
+    url = target.toString();
     execFileSync(process.execPath, [resolve("node_modules", "prisma", "build", "index.js"), "migrate", "deploy"], {
       env: { ...process.env, DATABASE_URL: url },
       stdio: "pipe",
+      timeout: 30000,
     });
     db = createDatabase(url);
     await seedDatabase(db);
+    await startServer();
+  }, 60000);
+
+  async function startServer(): Promise<void> {
     server = createApiServer(db);
     await new Promise<void>((resolveListen, reject) => {
       server.once("error", reject);
@@ -34,12 +54,25 @@ describe("SQLite completed-course workflow", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No test server address.");
     baseUrl = `http://127.0.0.1:${address.port}/api/demo/courses`;
-  }, 30000);
+  }
+
+  beforeEach(async () => {
+    await db.studentCourse.deleteMany();
+  });
 
   afterAll(async () => {
     if (server) await new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
     if (db) await db.$disconnect();
-    if (directory) rmSync(directory, { recursive: true, force: true });
+    if (cleanupUrl) {
+      const cleanup = createDatabase(cleanupUrl);
+      try {
+        // The identifier is generated above, never taken from connection settings.
+        if (!/^niner_test_[a-f0-9]{32}$/.test(schema)) throw new Error("Invalid test schema.");
+        await cleanup.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      } finally {
+        await cleanup.$disconnect();
+      }
+    }
   });
 
   async function save(courseIds: string[]) {
@@ -79,6 +112,15 @@ describe("SQLite completed-course workflow", () => {
     expect(await (await fetch(baseUrl)).json()).toEqual({ courseIds: [] });
   });
 
+  it("retrieves saved courses after restarting the API and database client", async () => {
+    expect((await save(["itcs-2214"])).status).toBe(200);
+    await new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
+    await db.$disconnect();
+    db = createDatabase(url);
+    await startServer();
+    expect(await (await fetch(baseUrl)).json()).toEqual({ courseIds: ["itcs-2214"] });
+  });
+
   it("rejects invalid and duplicate IDs without changing saved courses", async () => {
     await save(["itcs-2214"]);
     expect((await save(["unknown"])).status).toBe(400);
@@ -88,7 +130,7 @@ describe("SQLite completed-course workflow", () => {
 
   it("does not overwrite or delete records belonging to another course workflow", async () => {
     await db.studentCourse.create({
-      data: { studentId: DEMO_STUDENT_ID, courseId: "itis-3200", status: "IN_PROGRESS" },
+      data: { studentId: DEMO_STUDENT_ID, courseId: "itis-3200", status: "IN_PROGRESS", completedAt: new Date() },
     });
     expect((await save(["itis-3200"])).status).toBe(400);
     expect((await save([])).status).toBe(200);
@@ -97,7 +139,7 @@ describe("SQLite completed-course workflow", () => {
 
   it("keeps confirmed transcript courses separate from manual selections", async () => {
     await db.studentCourse.create({
-      data: { studentId: DEMO_STUDENT_ID, courseId: "itcs-2214", source: "TRANSCRIPT" },
+      data: { studentId: DEMO_STUDENT_ID, courseId: "itcs-2214", source: "TRANSCRIPT", completedAt: new Date() },
     });
     expect(await (await fetch(baseUrl)).json()).toEqual({ courseIds: [] });
     expect((await save(["itcs-2214"])).status).toBe(400);
@@ -105,6 +147,14 @@ describe("SQLite completed-course workflow", () => {
     expect(await db.studentCourse.findUnique({
       where: { studentId_courseId: { studentId: DEMO_STUDENT_ID, courseId: "itcs-2214" } },
     })).toMatchObject({ source: "TRANSCRIPT" });
+  });
+
+  it("does not delete another student's selections", async () => {
+    const otherStudentId = randomUUID();
+    await db.student.create({ data: { id: otherStudentId, email: `${otherStudentId}@example.invalid`, displayName: "Other sample student" } });
+    await db.studentCourse.create({ data: { studentId: otherStudentId, courseId: "itcs-2214", completedAt: new Date() } });
+    expect((await save([])).status).toBe(200);
+    expect(await db.studentCourse.count({ where: { studentId: otherStudentId } })).toBe(1);
   });
 
   it("rejects unsafe origins and malformed payloads", async () => {

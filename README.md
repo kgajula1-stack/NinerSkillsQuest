@@ -16,6 +16,10 @@ npm run dev
 
 Vite prints a local URL after the development server starts.
 
+For PostgreSQL and Prisma installation, local database creation, migrations,
+seeding, and teammate setup, see
+[docs/database-setup.md](./docs/database-setup.md).
+
 ## Commands
 
 ```sh
@@ -26,13 +30,16 @@ npm test
 ## Database workflow
 
 The completed-course screen can explicitly save its current list to a local
-SQLite database and load it back. The normal browser-local workflow still works
-without the database server. Set up the database once from the project root:
+PostgreSQL database and load it back. The normal browser-local workflow still works
+without the database server. Follow [database setup](docs/database-setup.md)
+to create PostgreSQL databases and configure credentials, then run from the
+project root:
 
 ```powershell
-Copy-Item .env.example .env
+# Copy the template only if .env does not already exist; fill in credentials.
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 npm run db:generate
-npm run db:migrate
+npm run db:deploy
 npm run db:seed
 ```
 
@@ -69,9 +76,11 @@ npm test
 npm run build
 ```
 
-The tests include an isolated SQLite integration workflow. The production
-build includes TypeScript checking. Configure `.env` as shown above before
-running `db:generate`.
+The default tests cover browser behavior. Run `npm run test:db` separately
+with `TEST_DATABASE_URL` configured for a disposable PostgreSQL database.
+The integration suite applies migrations in a unique schema and tests save,
+load, removal, validation, and persistence after restarting the API/client.
+The production build includes TypeScript checking.
 
 ## Usage
 

@@ -3,39 +3,43 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Student {
-  id            String             @id @default(cuid())
-  displayName   String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  courseRecords StudentCourse[]
-  careerGoal    StudentCareerGoal?
+  id              String             @id @default(uuid()) @db.Uuid
+  email           String             @unique
+  displayName     String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  courseSelections StudentCourse[]
+  careerGoal      StudentCareerGoal?
 
   @@map("students")
 }
 
 model Course {
-  id             String          @id
-  code           String          @unique
-  title          String
-  isActive       Boolean         @default(true)
-  skillMappings  CourseSkill[]
-  studentRecords StudentCourse[]
+  id              String          @id
+  code            String          @unique
+  title           String
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  skillMappings   CourseSkill[]
+  studentCourses StudentCourse[]
 
   @@map("courses")
 }
 
 model Skill {
-  id                    String                 @id
-  name                  String                 @unique
-  description           String?
-  courseMappings        CourseSkill[]
-  roadmapTargets        RoadmapSkill[]
-  courseRecommendations CourseRecommendation[]
-  practiceResources     PracticeResource[]
+  id            String          @id
+  name          String          @unique
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  courseMaps    CourseSkill[]
+  roadmapMaps   RoadmapSkill[]
+  recommendations Recommendation[]
 
   @@map("skills")
 }
@@ -43,8 +47,8 @@ model Skill {
 model CourseSkill {
   courseId String
   skillId  String
-  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@id([courseId, skillId])
   @@index([skillId])
@@ -52,30 +56,28 @@ model CourseSkill {
 }
 
 model StudentCourse {
-  id          String    @id @default(cuid())
-  studentId   String
+  studentId   String   @db.Uuid
   courseId    String
-  status      String    @default("COMPLETED")
-  completedAt DateTime?
-  source      String    @default("MANUAL")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  completedAt DateTime
+  status      String   @default("COMPLETED")
+  source      String   @default("MANUAL")
+  createdAt   DateTime @default(now())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@unique([studentId, courseId])
-  @@index([studentId, status])
+  @@id([studentId, courseId])
   @@index([courseId])
   @@map("student_courses")
 }
 
 model CareerRoadmap {
-  id           String              @id
-  name         String              @unique
-  description  String
-  isActive     Boolean             @default(true)
-  skillTargets RoadmapSkill[]
-  studentGoals StudentCareerGoal[]
+  id            String             @id
+  name          String             @unique
+  description   String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  skillMappings RoadmapSkill[]
+  studentGoals  StudentCareerGoal[]
 
   @@map("career_roadmaps")
 }
@@ -83,66 +85,50 @@ model CareerRoadmap {
 model RoadmapSkill {
   roadmapId String
   skillId   String
-  sortOrder Int           @default(0)
-  roadmap   CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-  skill     Skill         @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  roadmap   CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  skill     Skill         @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@id([roadmapId, skillId])
   @@index([skillId])
   @@map("roadmap_skills")
 }
 
-model EmployerProfile {
-  id             String              @id @default(cuid())
-  name           String
-  location       String
-  industry       String?
-  isIllustrative Boolean             @default(true)
-  studentGoals   StudentCareerGoal[]
+model Employer {
+  id          String             @id
+  name        String
+  location    String
+  industry    String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  careerGoals StudentCareerGoal[]
 
-  @@unique([name, location])
-  @@map("employer_profiles")
+  @@map("employers")
 }
 
 model StudentCareerGoal {
-  id                String           @id @default(cuid())
-  studentId         String           @unique
-  roadmapId         String?
-  employerProfileId String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  student           Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  roadmap           CareerRoadmap?   @relation(fields: [roadmapId], references: [id], onDelete: SetNull)
-  employerProfile   EmployerProfile? @relation(fields: [employerProfileId], references: [id], onDelete: SetNull)
+  studentId  String        @id @db.Uuid
+  roadmapId  String
+  employerId String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  student    Student       @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roadmap    CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  employer   Employer      @relation(fields: [employerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([roadmapId])
-  @@index([employerProfileId])
+  @@index([employerId])
   @@map("student_career_goals")
 }
 
-model CourseRecommendation {
-  id        String @id @default(cuid())
+model Recommendation {
+  id        String   @id
   skillId   String
-  code      String
+  type      String
   title     String
   url       String
-  sortOrder Int    @default(0)
-  skill     Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@unique([skillId, code])
-  @@index([skillId, sortOrder])
-  @@map("course_recommendations")
-}
-
-model PracticeResource {
-  id        String @id @default(cuid())
-  skillId   String
-  title     String
-  url       String
-  sortOrder Int    @default(0)
-  skill     Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
-
-  @@unique([skillId, url])
-  @@index([skillId, sortOrder])
-  @@map("practice_resources")
+  @@index([skillId])
+  @@map("recommendations")
 }
