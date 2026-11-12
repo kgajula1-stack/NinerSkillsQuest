@@ -48,6 +48,7 @@ individual contributions to be reviewed independently.
 - [Issue #4 test results](./issue-4-test-results.md)
 - [Carter's individual details](./carter-details.md)
 - [Kaushal's individual details](./kaushal-details.md)
+- [Proposed persistence UML diagrams and AI design review status](./uml/README.md)
 
 ## Shared project evidence
 

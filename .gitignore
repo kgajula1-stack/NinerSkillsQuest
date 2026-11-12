@@ -1,3 +1,8 @@
 node_modules/
 dist/
 *.tsbuildinfo
+.env
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal

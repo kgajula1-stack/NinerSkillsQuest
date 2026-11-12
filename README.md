@@ -23,6 +23,15 @@ npm run build
 npm test
 ```
 
+## Relational persistence model
+
+The current UI still uses browser storage and does not connect to a backend.
+The proposed Prisma/SQLite schema, initial migration, entity relationships,
+and data-integrity decisions are documented in
+[docs/data-model.md](./docs/data-model.md). Use Node.js and Prisma commands
+there to validate and create the local development database. The schema is
+designed to be portable to PostgreSQL when a backend is introduced.
+
 ## Sprint 1 verification
 
 The Sprint 1 implementation covers completed-course entry and career-goal

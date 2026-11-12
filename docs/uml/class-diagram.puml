@@ -1,0 +1,144 @@
+@startuml
+title Proposed relational domain model (Prisma)
+hide methods
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+
+legend right
+  PK = primary key; FK = foreign key; UQ = unique
+  ? = nullable; defaults shown after =
+endlegend
+
+class Student {
+  id: String {PK, cuid()}
+  displayName: String?
+  createdAt: DateTime {default: now()}
+  updatedAt: DateTime {updatedAt}
+}
+class Course {
+  id: String {PK}
+  code: String {UQ}
+  title: String
+  isActive: Boolean = true
+}
+class Skill {
+  id: String {PK}
+  name: String {UQ}
+  description: String?
+}
+class CourseSkill {
+  courseId: String {PK, FK}
+  skillId: String {PK, FK}
+}
+class StudentCourse {
+  id: String {PK, cuid()}
+  studentId: String {FK}
+  courseId: String {FK}
+  status: String = "COMPLETED"
+  completedAt: DateTime?
+  transcriptCandidateId: String? {FK, UQ}
+  createdAt: DateTime {default: now()}
+  updatedAt: DateTime {updatedAt}
+  --
+  {UQ: studentId, courseId}
+}
+class CareerRoadmap {
+  id: String {PK}
+  name: String {UQ}
+  description: String
+  isActive: Boolean = true
+}
+class RoadmapSkill {
+  roadmapId: String {PK, FK}
+  skillId: String {PK, FK}
+  sortOrder: Int = 0
+}
+class EmployerProfile {
+  id: String {PK, cuid()}
+  name: String
+  location: String
+  industry: String?
+  isIllustrative: Boolean = true
+  --
+  {UQ: name, location}
+}
+class StudentCareerGoal {
+  id: String {PK, cuid()}
+  studentId: String {FK, UQ}
+  roadmapId: String? {FK}
+  employerProfileId: String? {FK}
+  createdAt: DateTime {default: now()}
+  updatedAt: DateTime {updatedAt}
+}
+class Transcript {
+  id: String {PK, cuid()}
+  studentId: String {FK}
+  originalFileName: String
+  mediaType: String
+  sizeBytes: Int
+  storageKey: String {UQ}
+  status: String = "UPLOADED"
+  uploadedAt: DateTime {default: now()}
+  reviewedAt: DateTime?
+}
+class TranscriptCourseCandidate {
+  id: String {PK, cuid()}
+  transcriptId: String {FK}
+  rawCourseCode: String
+  rawCourseTitle: String?
+  matchedCourseId: String? {FK}
+  reviewStatus: String = "PENDING"
+  createdAt: DateTime {default: now()}
+  updatedAt: DateTime {updatedAt}
+}
+class CourseRecommendation {
+  id: String {PK, cuid()}
+  skillId: String {FK}
+  code: String
+  title: String
+  url: String
+  sortOrder: Int = 0
+  --
+  {UQ: skillId, code}
+}
+class PracticeResource {
+  id: String {PK, cuid()}
+  skillId: String {FK}
+  title: String
+  url: String
+  sortOrder: Int = 0
+  --
+  {UQ: skillId, url}
+}
+
+Student "1" -- "0..*" StudentCourse
+Course "1" -- "0..*" StudentCourse
+Course "1" -- "0..*" CourseSkill
+Skill "1" -- "0..*" CourseSkill
+CareerRoadmap "1" -- "0..*" RoadmapSkill
+Skill "1" -- "0..*" RoadmapSkill
+Student "1" -- "0..1" StudentCareerGoal
+CareerRoadmap "0..1" -- "0..*" StudentCareerGoal
+EmployerProfile "0..1" -- "0..*" StudentCareerGoal
+Student "1" -- "0..*" Transcript
+Transcript "1" -- "0..*" TranscriptCourseCandidate
+Course "0..1" -- "0..*" TranscriptCourseCandidate : matched course
+TranscriptCourseCandidate "0..1" -- "0..1" StudentCourse : accepted as
+Skill "1" -- "0..*" CourseRecommendation
+Skill "1" -- "0..*" PracticeResource
+
+note bottom of StudentCourse
+  A student/course pair is unique; retakes are not modeled.
+  A linked candidate must belong to the same student and
+  match the course; a future service must enforce this.
+end note
+note bottom of Transcript
+  Only metadata and a private storage key are stored here;
+  document bytes are outside the database.
+end note
+note bottom of Skill
+  Course mappings indicate possible exposure,
+  not verified skill mastery.
+end note
+@enduml
