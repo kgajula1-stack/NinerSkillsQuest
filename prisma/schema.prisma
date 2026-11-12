@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id              String             @id @default(uuid()) @db.Uuid
+  email           String             @unique
+  displayName     String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  courseSelections StudentCourse[]
+  careerGoal      StudentCareerGoal?
+
+  @@map("students")
+}
+
+model Course {
+  id              String          @id
+  code            String          @unique
+  title           String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  skillMappings   CourseSkill[]
+  studentCourses StudentCourse[]
+
+  @@map("courses")
+}
+
+model Skill {
+  id            String          @id
+  name          String          @unique
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  courseMaps    CourseSkill[]
+  roadmapMaps   RoadmapSkill[]
+  recommendations Recommendation[]
+
+  @@map("skills")
+}
+
+model CourseSkill {
+  courseId String
+  skillId  String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([courseId, skillId])
+  @@index([skillId])
+  @@map("course_skills")
+}
+
+model StudentCourse {
+  studentId   String   @db.Uuid
+  courseId    String
+  completedAt DateTime
+  createdAt   DateTime @default(now())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([studentId, courseId])
+  @@index([courseId])
+  @@map("student_courses")
+}
+
+model CareerRoadmap {
+  id            String             @id
+  name          String             @unique
+  description   String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  skillMappings RoadmapSkill[]
+  studentGoals  StudentCareerGoal[]
+
+  @@map("career_roadmaps")
+}
+
+model RoadmapSkill {
+  roadmapId String
+  skillId   String
+  roadmap   CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  skill     Skill         @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([roadmapId, skillId])
+  @@index([skillId])
+  @@map("roadmap_skills")
+}
+
+model Employer {
+  id          String             @id
+  name        String
+  location    String
+  industry    String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  careerGoals StudentCareerGoal[]
+
+  @@map("employers")
+}
+
+model StudentCareerGoal {
+  studentId  String        @id @db.Uuid
+  roadmapId  String
+  employerId String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  student    Student       @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roadmap    CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  employer   Employer      @relation(fields: [employerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([roadmapId])
+  @@index([employerId])
+  @@map("student_career_goals")
+}
+
+model Recommendation {
+  id        String   @id
+  skillId   String
+  type      String
+  title     String
+  url       String
+  createdAt DateTime @default(now())
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([skillId])
+  @@map("recommendations")
+}

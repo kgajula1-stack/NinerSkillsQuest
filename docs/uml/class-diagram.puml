@@ -1,60 +1,91 @@
 @startuml
-title Niner Skills Quest - provisional Sprint 2 domain model
+title Niner Skills Quest - Sprint 2 persistence domain model
 
 class Student {
-  id
+  id: UUID
+  email: string <<unique>>
+  displayName: string
+  createdAt: datetime
+  updatedAt: datetime
 }
 
 class Course {
-  id
-  code
-  title
+  id: string
+  code: string <<unique>>
+  title: string
+  createdAt: datetime
+  updatedAt: datetime
 }
 
 class Skill {
-  id
-  name
+  id: string
+  name: string <<unique>>
+  createdAt: datetime
+  updatedAt: datetime
 }
 
-class CareerRoadmap {
-  id
-  name
-  description
-}
-
-class EmployerProfile {
-  id
-  name
-  location
-  industry
+class CourseSkill {
+  courseId: string <<PK>>
+  skillId: string <<PK>>
 }
 
 class StudentCourse {
-  studentId
-  courseId
+  studentId: UUID <<PK>>
+  courseId: string <<PK>>
+  completedAt: datetime
+  createdAt: datetime
+}
+
+class CareerRoadmap {
+  id: string
+  name: string <<unique>>
+  description: string
+  createdAt: datetime
+  updatedAt: datetime
+}
+
+class RoadmapSkill {
+  roadmapId: string <<PK>>
+  skillId: string <<PK>>
+}
+
+class Employer {
+  id: string
+  name: string
+  location: string
+  industry: string
+  createdAt: datetime
+  updatedAt: datetime
 }
 
 class StudentCareerGoal {
-  studentId
-  roadmapId
-  employerId
+  studentId: UUID <<PK>>
+  roadmapId: string
+  employerId: string
+  createdAt: datetime
+  updatedAt: datetime
 }
 
 class Recommendation {
-  skillId
-  type
-  title
-  url
+  id: string
+  skillId: string
+  type: string
+  title: string
+  url: string
+  createdAt: datetime
 }
 
 Student "1" -- "0..*" StudentCourse
 Course "1" -- "0..*" StudentCourse
-Course "0..*" -- "0..*" Skill
+Course "1" -- "0..*" CourseSkill
+Skill "1" -- "0..*" CourseSkill
 Student "1" -- "0..1" StudentCareerGoal
 CareerRoadmap "1" -- "0..*" StudentCareerGoal
-EmployerProfile "1" -- "0..*" StudentCareerGoal
+CareerRoadmap "1" -- "0..*" RoadmapSkill
+Skill "1" -- "0..*" RoadmapSkill
+Employer "1" -- "0..*" StudentCareerGoal
 Skill "1" -- "0..*" Recommendation
 
-note "Provisional only: catalog ownership, skill join tables, and account identity require team review." as N1
-N1 .. Student
+note "StudentCareerGoal.studentId is unique because the current UI supports one active goal per student." as N1
+N1 .. StudentCareerGoal
 @enduml

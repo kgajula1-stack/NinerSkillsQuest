@@ -16,6 +16,10 @@ npm run dev
 
 Vite prints a local URL after the development server starts.
 
+For PostgreSQL and Prisma installation, local database creation, migrations,
+seeding, and teammate setup, see
+[docs/database-setup.md](./docs/database-setup.md).
+
 ## Commands
 
 ```sh

@@ -1,11 +1,11 @@
 @startuml
-title Niner Skills Quest - provisional completed-course persistence flow
+title Niner Skills Quest - completed-course persistence flow
 
 actor Student
 boundary "Course entry UI" as UI
-control "Application state/service" as Service
-database "Data-access layer" as Repository
-database "Development database" as DB
+control "Course service/API" as Service
+control "Course repository" as Repository
+database "PostgreSQL database" as DB
 
 Student -> UI: Search and select a supported course
 UI -> Service: Request course selection
@@ -14,15 +14,19 @@ alt Invalid or duplicate course
   Service --> UI: Recoverable validation error
 else Valid selection
   Service -> Repository: Save student-course selection
-  Repository -> DB: Insert or update record
+  Repository -> DB: Insert StudentCourse
   DB --> Repository: Persisted record
   Repository --> Service: Saved selection
   Service --> UI: Refresh courses and mapped skills
   UI --> Student: Show saved course and skills
 end
 
-note over Service,DB
-The database, ORM, identity model, and API boundary
-are not selected yet.
-end note
+Student -> UI: Restart application
+UI -> Service: Request saved courses
+Service -> Repository: Load StudentCourse records
+Repository -> DB: Query StudentCourse with CourseSkill
+DB --> Repository: Courses and mapped skills
+Repository --> Service: Saved courses and skills
+Service --> UI: Render persisted selections
+UI --> Student: Show saved course and skills
 @enduml
