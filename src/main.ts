@@ -23,6 +23,12 @@ let draftCourseId = "";
 
 type AppPage = "career-goal" | "courses" | "skill-review";
 
+const nextPageByPage: Record<AppPage, AppPage | null> = {
+  "career-goal": "courses",
+  courses: "skill-review",
+  "skill-review": null,
+};
+
 function getActivePage(): AppPage {
   const page = window.location.hash.slice(1);
   return page === "career-goal" || page === "skill-review" ? page : "courses";
@@ -121,6 +127,8 @@ function render(focusTarget?: string): void {
   }
 
   const activePage = getActivePage();
+  const nextPage = nextPageByPage[activePage];
+  const startingPointLabel = careerGoalStore.getState().selectedRoadmap?.name ?? "career";
   const pageHeading = {
     "career-goal": {
       title: "Choose your career goal",
@@ -128,7 +136,7 @@ function render(focusTarget?: string): void {
     },
     courses: {
       title: "Add what you already know",
-      description: "Add completed courses and review their suggested skills.",
+      description: `Build your ${startingPointLabel} starting point.`,
     },
     "skill-review": {
       title: "Review your skills",
@@ -137,7 +145,6 @@ function render(focusTarget?: string): void {
   }[activePage];
   const state = courseSelectionStore.getState();
   const careerGoal = careerGoalStore.getState();
-  const startingPointLabel = careerGoal.selectedRoadmap?.name ?? "career";
   const selectedIds = new Set(state.completedCourseIds);
   const availableCourses = courses.filter((course) => !selectedIds.has(course.id));
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -209,13 +216,8 @@ function render(focusTarget?: string): void {
     <main class="app-shell" aria-labelledby="page-title">
       <header class="panel-heading">
         <div>
-<<<<<<< Updated upstream
-          <h1 id="page-title">Add what you already know</h1>
-          <p>Build your ${escapeHtml(startingPointLabel)} starting point.</p>
-=======
-          <h1 id="page-title">${pageHeading.title}</h1>
+          <h1 id="page-title" data-focus-target="page-title" tabindex="-1">${pageHeading.title}</h1>
           <p>${pageHeading.description}</p>
->>>>>>> Stashed changes
         </div>
         <div class="session-controls">
           <span class="demo-badge">Local demo session</span>
@@ -308,13 +310,10 @@ function render(focusTarget?: string): void {
         ${
           careerGoal.targetProfile && careerGoal.selectedRoadmap && careerGoal.selectedEmployer
             ? `<div class="goal-summary" aria-live="polite">
-                <p class="goal-summary-label">Current goal</p>
-                <h3>${escapeHtml(careerGoal.selectedRoadmap.name)} · ${escapeHtml(careerGoal.selectedEmployer.name)}</h3>
-                <p class="goal-employer-details">
-                  ${escapeHtml(careerGoal.selectedEmployer.industry)} · ${escapeHtml(careerGoal.selectedEmployer.location)}
-                </p>
-                <h4>Roadmap skill targets</h4>
-                ${
+              <p class="goal-summary-label">Current goal</p>
+              <h3>${escapeHtml(careerGoal.selectedRoadmap.name)} · ${escapeHtml(careerGoal.selectedEmployer.name)}</h3>
+              <h4>Roadmap skill targets</h4>
+              ${
                   targetSkills.length > 0
                     ? `<ul class="skill-tags goal-skill-tags" aria-label="Target skills for ${escapeHtml(careerGoal.selectedRoadmap.name)}">
                         ${targetSkills.map((skill) => `<li>${escapeHtml(skill.name)}</li>`).join("")}
@@ -324,14 +323,6 @@ function render(focusTarget?: string): void {
               </div>`
             : ""
         }
-        ${
-          careerGoal.targetProfile
-            ? `<p class="goal-status" aria-live="polite">${escapeHtml(getCareerGoalAnnouncementText(careerGoal))}</p>`
-            : ""
-        }
-        <p class="goal-demo-note">
-          Employer profiles and target skill mappings are illustrative local-demo data.
-        </p>
       </section>
 
       <section
@@ -605,7 +596,7 @@ function render(focusTarget?: string): void {
       </section>
 
       <button class="button button-primary save-button" type="button">
-        Save and continue →
+        ${nextPage ? "Save and continue →" : "Save progress"}
       </button>
 
       <p class="disclaimer">
@@ -712,6 +703,9 @@ function render(focusTarget?: string): void {
 
   root.querySelector<HTMLButtonElement>(".save-button")?.addEventListener("click", () => {
     announce(getSaveAnnouncementText(state, careerGoal));
+    if (nextPage) {
+      window.location.hash = nextPage;
+    }
   });
 
   root.querySelector<HTMLButtonElement>(".sign-out-button")?.addEventListener("click", () => {
@@ -722,5 +716,5 @@ function render(focusTarget?: string): void {
 courseSelectionStore.subscribe(() => render("course-search"));
 careerGoalStore.subscribe(() => render());
 demoSessionStore.subscribe(() => render());
-window.addEventListener("hashchange", () => render());
+window.addEventListener("hashchange", () => render("page-title"));
 render();

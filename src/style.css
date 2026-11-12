@@ -545,9 +545,7 @@ select {
   line-height: 1.4;
 }
 
-.career-goal-heading p,
-.goal-employer-details,
-.goal-demo-note {
+.career-goal-heading p {
   margin: 0;
   color: var(--color-muted);
   font-size: 11px;
@@ -600,10 +598,6 @@ select {
 .goal-skill-tags li {
   background: var(--color-purple-soft);
   color: var(--color-purple);
-}
-
-.goal-demo-note {
-  font-size: 10px;
 }
 
 .recommendations {
