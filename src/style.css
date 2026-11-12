@@ -114,6 +114,45 @@ select {
   white-space: nowrap;
 }
 
+.page-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--color-surface-soft);
+}
+
+.page-navigation a {
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.page-navigation a[aria-current="page"] {
+  background: #fff;
+  color: var(--color-green);
+  font-weight: 700;
+}
+
+.page-navigation a:focus-visible {
+  outline: 3px solid #9bc7aa;
+  outline-offset: 2px;
+}
+
+.feature-page[hidden] {
+  display: none;
+}
+
 .entry-tabs {
   display: flex;
   gap: 6px;
@@ -150,6 +189,20 @@ select {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.course-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.skill-review-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
 }
 
 .field {

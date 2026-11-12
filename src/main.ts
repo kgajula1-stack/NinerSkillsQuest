@@ -21,6 +21,13 @@ const announcer = document.querySelector<HTMLDivElement>("#announcer");
 let searchQuery = "";
 let draftCourseId = "";
 
+type AppPage = "career-goal" | "courses" | "skill-review";
+
+function getActivePage(): AppPage {
+  const page = window.location.hash.slice(1);
+  return page === "career-goal" || page === "skill-review" ? page : "courses";
+}
+
 function announce(message: string): void {
   if (announcer) {
     announcer.textContent = message;
@@ -113,6 +120,21 @@ function render(focusTarget?: string): void {
     return;
   }
 
+  const activePage = getActivePage();
+  const pageHeading = {
+    "career-goal": {
+      title: "Choose your career goal",
+      description: "Choose a direction to compare your course skills against.",
+    },
+    courses: {
+      title: "Add what you already know",
+      description: "Add completed courses and review their suggested skills.",
+    },
+    "skill-review": {
+      title: "Review your skills",
+      description: "Compare course-mapped skills with your career goal.",
+    },
+  }[activePage];
   const state = courseSelectionStore.getState();
   const careerGoal = careerGoalStore.getState();
   const startingPointLabel = careerGoal.selectedRoadmap?.name ?? "career";
@@ -187,8 +209,13 @@ function render(focusTarget?: string): void {
     <main class="app-shell" aria-labelledby="page-title">
       <header class="panel-heading">
         <div>
+<<<<<<< Updated upstream
           <h1 id="page-title">Add what you already know</h1>
           <p>Build your ${escapeHtml(startingPointLabel)} starting point.</p>
+=======
+          <h1 id="page-title">${pageHeading.title}</h1>
+          <p>${pageHeading.description}</p>
+>>>>>>> Stashed changes
         </div>
         <div class="session-controls">
           <span class="demo-badge">Local demo session</span>
@@ -196,6 +223,122 @@ function render(focusTarget?: string): void {
         </div>
       </header>
 
+      <nav class="page-navigation" aria-label="Main navigation">
+        <a
+          href="#career-goal"
+          data-focus-target="page-career-goal"
+          ${activePage === "career-goal" ? 'aria-current="page"' : ""}
+        >
+          Career goal
+        </a>
+        <a
+          href="#courses"
+          data-focus-target="page-courses"
+          ${activePage === "courses" ? 'aria-current="page"' : ""}
+        >
+          Courses
+        </a>
+        <a
+          href="#skill-review"
+          data-focus-target="page-skill-review"
+          ${activePage === "skill-review" ? 'aria-current="page"' : ""}
+        >
+          Skill review
+        </a>
+      </nav>
+
+      <section
+        class="career-goal feature-page"
+        aria-labelledby="career-goal-title"
+        ${activePage !== "career-goal" ? "hidden" : ""}
+      >
+        <div class="career-goal-heading">
+          <h2 id="career-goal-title">Choose your career goal</h2>
+          <p>Pick a roadmap and a Charlotte employer to define your target profile.</p>
+        </div>
+        <div class="goal-fields">
+          <div class="field">
+            <label for="career-roadmap">Career roadmap</label>
+            <select
+              id="career-roadmap"
+              data-focus-target="career-roadmap"
+              aria-describedby="career-goal-prompt"
+            >
+              <option value="">Select a roadmap</option>
+              ${careerRoadmaps
+                .map(
+                  (roadmap) => `
+                    <option
+                      value="${escapeHtml(roadmap.id)}"
+                      ${careerGoal.selectedRoadmapId === roadmap.id ? "selected" : ""}
+                    >
+                      ${escapeHtml(roadmap.name)}
+                    </option>`,
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label for="career-employer">Charlotte employer</label>
+            <select
+              id="career-employer"
+              data-focus-target="career-employer"
+              aria-describedby="career-goal-prompt"
+            >
+              <option value="">Select an employer</option>
+              ${employerProfiles
+                .map(
+                  (employer) => `
+                    <option
+                      value="${escapeHtml(employer.id)}"
+                      ${careerGoal.selectedEmployerId === employer.id ? "selected" : ""}
+                    >
+                      ${escapeHtml(employer.name)}
+                    </option>`,
+                )
+                .join("")}
+            </select>
+          </div>
+        </div>
+        ${
+          careerGoalPrompt
+            ? `<p id="career-goal-prompt" class="goal-prompt" role="status">${escapeHtml(careerGoalPrompt)}</p>`
+            : `<p id="career-goal-prompt" class="sr-only" role="status">Career goal selected.</p>`
+        }
+        ${
+          careerGoal.targetProfile && careerGoal.selectedRoadmap && careerGoal.selectedEmployer
+            ? `<div class="goal-summary" aria-live="polite">
+                <p class="goal-summary-label">Current goal</p>
+                <h3>${escapeHtml(careerGoal.selectedRoadmap.name)} · ${escapeHtml(careerGoal.selectedEmployer.name)}</h3>
+                <p class="goal-employer-details">
+                  ${escapeHtml(careerGoal.selectedEmployer.industry)} · ${escapeHtml(careerGoal.selectedEmployer.location)}
+                </p>
+                <h4>Roadmap skill targets</h4>
+                ${
+                  targetSkills.length > 0
+                    ? `<ul class="skill-tags goal-skill-tags" aria-label="Target skills for ${escapeHtml(careerGoal.selectedRoadmap.name)}">
+                        ${targetSkills.map((skill) => `<li>${escapeHtml(skill.name)}</li>`).join("")}
+                      </ul>`
+                    : `<p class="goal-prompt">No target skills are currently mapped to this roadmap.</p>`
+                }
+              </div>`
+            : ""
+        }
+        ${
+          careerGoal.targetProfile
+            ? `<p class="goal-status" aria-live="polite">${escapeHtml(getCareerGoalAnnouncementText(careerGoal))}</p>`
+            : ""
+        }
+        <p class="goal-demo-note">
+          Employer profiles and target skill mappings are illustrative local-demo data.
+        </p>
+      </section>
+
+      <section
+        class="course-workflow feature-page"
+        aria-label="Add completed courses"
+        ${activePage !== "courses" ? "hidden" : ""}
+      >
       <nav class="entry-tabs" aria-label="Experience type">
         <button class="entry-tab is-active" type="button" aria-current="page">Course</button>
         <button
@@ -346,90 +489,13 @@ function render(focusTarget?: string): void {
               : `<p class="mapped-empty">No courses selected yet. Add a supported course to see its mapped skills.</p>`
         }
       </section>
-
-      <section class="career-goal" aria-labelledby="career-goal-title">
-        <div class="career-goal-heading">
-          <h2 id="career-goal-title">Choose your career goal</h2>
-          <p>Pick a roadmap and a Charlotte employer to define your target profile.</p>
-        </div>
-        <div class="goal-fields">
-          <div class="field">
-            <label for="career-roadmap">Career roadmap</label>
-            <select
-              id="career-roadmap"
-              data-focus-target="career-roadmap"
-              aria-describedby="career-goal-prompt"
-            >
-              <option value="">Select a roadmap</option>
-              ${careerRoadmaps
-                .map(
-                  (roadmap) => `
-                    <option
-                      value="${escapeHtml(roadmap.id)}"
-                      ${careerGoal.selectedRoadmapId === roadmap.id ? "selected" : ""}
-                    >
-                      ${escapeHtml(roadmap.name)}
-                    </option>`,
-                )
-                .join("")}
-            </select>
-          </div>
-          <div class="field">
-            <label for="career-employer">Charlotte employer</label>
-            <select
-              id="career-employer"
-              data-focus-target="career-employer"
-              aria-describedby="career-goal-prompt"
-            >
-              <option value="">Select an employer</option>
-              ${employerProfiles
-                .map(
-                  (employer) => `
-                    <option
-                      value="${escapeHtml(employer.id)}"
-                      ${careerGoal.selectedEmployerId === employer.id ? "selected" : ""}
-                    >
-                      ${escapeHtml(employer.name)}
-                    </option>`,
-                )
-                .join("")}
-            </select>
-          </div>
-        </div>
-        ${
-          careerGoalPrompt
-            ? `<p id="career-goal-prompt" class="goal-prompt" role="status">${escapeHtml(careerGoalPrompt)}</p>`
-            : `<p id="career-goal-prompt" class="sr-only" role="status">Career goal selected.</p>`
-        }
-        ${
-          careerGoal.targetProfile && careerGoal.selectedRoadmap && careerGoal.selectedEmployer
-            ? `<div class="goal-summary" aria-live="polite">
-                <p class="goal-summary-label">Current goal</p>
-                <h3>${escapeHtml(careerGoal.selectedRoadmap.name)} · ${escapeHtml(careerGoal.selectedEmployer.name)}</h3>
-                <p class="goal-employer-details">
-                  ${escapeHtml(careerGoal.selectedEmployer.industry)} · ${escapeHtml(careerGoal.selectedEmployer.location)}
-                </p>
-                <h4>Roadmap skill targets</h4>
-                ${
-                  targetSkills.length > 0
-                    ? `<ul class="skill-tags goal-skill-tags" aria-label="Target skills for ${escapeHtml(careerGoal.selectedRoadmap.name)}">
-                        ${targetSkills.map((skill) => `<li>${escapeHtml(skill.name)}</li>`).join("")}
-                      </ul>`
-                    : `<p class="goal-prompt">No target skills are currently mapped to this roadmap.</p>`
-                }
-              </div>`
-            : ""
-        }
-          ${
-            careerGoal.targetProfile
-              ? `<p class="goal-status" aria-live="polite">${escapeHtml(getCareerGoalAnnouncementText(careerGoal))}</p>`
-              : ""
-          }
-        <p class="goal-demo-note">
-          Employer profiles and target skill mappings are illustrative local-demo data.
-        </p>
       </section>
 
+      <section
+        class="skill-review-workflow feature-page"
+        aria-label="Skill comparison and recommendations"
+        ${activePage !== "skill-review" ? "hidden" : ""}
+      >
       <section class="skill-gap" aria-labelledby="skill-gap-title" aria-live="polite">
         <h2 id="skill-gap-title">Compare your skills with your goal</h2>
         ${
@@ -536,6 +602,7 @@ function render(focusTarget?: string): void {
             `
             : ""
       }
+      </section>
 
       <button class="button button-primary save-button" type="button">
         Save and continue →
@@ -655,4 +722,5 @@ function render(focusTarget?: string): void {
 courseSelectionStore.subscribe(() => render("course-search"));
 careerGoalStore.subscribe(() => render());
 demoSessionStore.subscribe(() => render());
+window.addEventListener("hashchange", () => render());
 render();

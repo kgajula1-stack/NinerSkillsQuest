@@ -2,7 +2,8 @@
 
 These diagrams describe the **proposed** relational persistence layer, not an
 implemented backend. The existing Vite application stores its selections in
-browser `localStorage`; it does not call Prisma or a database.
+browser `localStorage`; it does not call Prisma or a database. The identity model
+and API boundary have not been selected and require team review.
 
 - [Class diagram source](./class-diagram.puml) |
   [rendered SVG](./class-diagram.svg) maps the existing
