@@ -82,6 +82,18 @@ export class CourseSelectionStore {
     this.notify();
   }
 
+  replaceCourses(courseIds: string[]): void {
+    if (
+      courseIds.some((id) => !this.courseById.has(id)) ||
+      new Set(courseIds).size !== courseIds.length
+    ) {
+      throw new Error("The database returned unsupported or duplicate courses.");
+    }
+    this.completedCourseIds = [...courseIds];
+    this.saveSelections();
+    this.notify();
+  }
+
   private getBrowserStorage(): StoragePort | null {
     try {
       return window.localStorage;

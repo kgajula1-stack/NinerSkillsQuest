@@ -95,6 +95,20 @@ describe("course selection state", () => {
     ]);
   });
 
+  it("replaces a browser list with validated database selections", () => {
+    const storage = createStorage();
+    const store = new CourseSelectionStore(storage);
+    store.addCourse("itcs-2214");
+    store.replaceCourses(["itis-3200"]);
+    expect(store.getState().skills.map((skill) => skill.id)).toEqual(["information-security", "networking"]);
+    expect(new CourseSelectionStore(storage).getState().completedCourseIds).toEqual(["itis-3200"]);
+    expect(() => store.replaceCourses(["unknown"])).toThrow();
+    expect(() => store.replaceCourses(["itis-3200", "itis-3200"])).toThrow();
+    expect(store.getState().completedCourseIds).toEqual(["itis-3200"]);
+    store.replaceCourses([]);
+    expect(store.getState().completedCourses).toEqual([]);
+  });
+
   it("recovers valid saved IDs and reports skipped invalid data", () => {
     const storage = createStorage(
       JSON.stringify(["itcs-2214", "unknown-course", 4, "itcs-2214"]),

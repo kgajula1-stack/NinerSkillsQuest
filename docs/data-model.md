@@ -1,9 +1,9 @@
 # Relational data model
 
-The application currently runs entirely in the browser and saves course
-selections and career goals in `localStorage`. This schema is the proposed
-relational persistence layer for a backend; adding it does not connect the
-current UI to a database. SQLite is the local development provider, and the
+The application keeps course selections and career goals in `localStorage`.
+An optional local API also lets the course screen explicitly save and load
+manual completed-course selections for one shared sample student in SQLite.
+Career goals and other workflows are not connected to the database. The
 Prisma models use ordinary scalar fields and relations so the schema can be
 ported to PostgreSQL by changing the Prisma datasource and generating a
 provider-specific migration.
@@ -16,26 +16,22 @@ provider-specific migration.
 | `Course` | Supported course catalog (`id`, unique `code`, `title`, `isActive`). IDs can use the stable course keys already in `src/data/catalog.ts`. |
 | `Skill` | Shared skill catalog (`id`, unique `name`, optional `description`). IDs can use the existing stable skill keys. |
 | `CourseSkill` | Many-to-many mapping between a catalog course and its suggested skills. Composite key prevents duplicate mappings. |
-| `StudentCourse` | Student course entry (`status`, optional completion date). One record per student/course; skill coverage is derived through `CourseSkill`, not asserted as verified mastery. |
+| `StudentCourse` | Student course entry (`status`, optional completion date, source). One record per student/course; skill coverage is derived through `CourseSkill`, not asserted as verified mastery. |
 | `CareerRoadmap` | Roadmap catalog (`id`, unique `name`, description, active flag). |
 | `RoadmapSkill` | Many-to-many roadmap target mapping with a display order. Composite key prevents duplicate targets. |
 | `EmployerProfile` | Employer choice (`name`, `location`, optional `industry`, illustrative-data flag). Name/location pairs are unique. |
 | `StudentCareerGoal` | The single current goal per student. Roadmap and employer are independently nullable so incomplete form selections can be saved. |
-| `Transcript` | Uploaded-document metadata and storage key; the file itself is kept outside the relational database. |
-| `TranscriptCourseCandidate` | A parsed course awaiting review, with raw transcript text fields, optional catalog match, and review status. Acceptance can link it to a `StudentCourse`. |
 | `CourseRecommendation` | Skill-specific elective suggestion (`code`, `title`, `url`, ordering). |
 | `PracticeResource` | Skill-specific practice link (`title`, `url`, ordering). |
 
 ### Relationship summary
 
-- `Student` 1-to-many `StudentCourse` and `Transcript`; one-to-zero/one
+- `Student` 1-to-many `StudentCourse`; one-to-zero/one
   `StudentCareerGoal`.
 - `Course` many-to-many `Skill` through `CourseSkill`.
 - `CareerRoadmap` many-to-many `Skill` through `RoadmapSkill`.
 - `StudentCareerGoal` optionally references one `CareerRoadmap` and one
   `EmployerProfile`.
-- `Transcript` 1-to-many `TranscriptCourseCandidate`; a candidate can optionally
-  match a catalog `Course` and be accepted as one `StudentCourse`.
 - `Skill` 1-to-many `CourseRecommendation` and `PracticeResource`.
 
 ## Constraints and data integrity
@@ -48,28 +44,33 @@ provider-specific migration.
   this initial model, matching the current UI's duplicate-prevention behavior.
 - A student has at most one current career goal, while either selection may be
   incomplete.
-- Backend services must review transcript candidates before acceptance and ensure
-  the candidate belongs to the same student and matches the course being
-  recorded. These cross-record checks are not enforced by the schema. Deleting
-  a transcript removes its candidates and any course entries accepted from
-  them; manually entered course records remain.
+- Future transcript processing must save only student-confirmed course records,
+  with `source` set to `TRANSCRIPT`. The local manual-course workflow only
+  manages `MANUAL` records and does not overwrite transcript-confirmed records.
 - Deleting a student cascades their private records. Catalog courses referenced
   by student records cannot be deleted; deactivate them instead.
 - Course-derived skill matches mean “recorded from course mappings,” not skill
   mastery. No `StudentSkill` mastery table is used.
 - `status` fields are strings for SQLite/PostgreSQL portability. Application
-  services must validate allowed values (course: `COMPLETED` or `IN_PROGRESS`;
-  transcript: `UPLOADED`, `PROCESSING`, `REVIEW_REQUIRED`, `FAILED`;
-  candidate: `PENDING`, `ACCEPTED`, `REJECTED`).
-- Do not store full transcript contents or uploaded file bytes in the database.
-  Candidate course codes and titles are extracted transcript data. `storageKey`
-  must refer to private storage; access and file deletion must be handled by the
-  backend and scoped to the owning student.
+  services must validate allowed values (course status: `COMPLETED` or
+  `IN_PROGRESS`; source: `MANUAL` or `TRANSCRIPT`).
+- Transcript upload is not implemented. A future implementation must show a
+  privacy notice before upload, process raw bytes and review candidates only in
+  memory, and never persist raw files, extracted personal information, or
+  unconfirmed candidates in databases, logs, analytics, or application-managed
+  files. Release temporary references on success, failure, and cancellation;
+  cancelling before confirmation must leave saved coursework unchanged.
 
 ## Schema and migrations
 
 The ORM schema is [prisma/schema.prisma](../prisma/schema.prisma). The initial
 migration is stored under [prisma/migrations/](../prisma/migrations/).
+The transcript cleanup migration preserves manual courses and accepted
+transcript-linked courses whose student and catalog course match, but removes
+unconfirmed or inconsistent linked records and the transcript metadata and
+candidate tables. It cannot remove files previously stored outside SQLite,
+database backups, or recoverable deleted bytes: operators must separately
+identify and securely dispose of any such data before relying on this policy.
 
 For local development, use a Node.js version supported by Prisma 7 (20.19 or
 later in the 20.x line, 22.12 or later in the 22.x line, or 24 and later), then
@@ -80,13 +81,19 @@ Copy-Item .env.example .env
 npm run db:validate
 npm run db:migrate
 npm run db:generate
+npm run db:seed
 ```
 
 Prisma loads `.env` through `prisma.config.ts`. With the example URL, `db:migrate`
 creates or updates the SQLite database at `prisma/dev.db`; this file and `.env`
-are ignored by Git. The Vite application does not import the
-Prisma client because Prisma is a server-side ORM and the repository has no
-backend yet.
+are ignored by Git. The seed upserts the sample student, courses, skills, and
+course mappings without clearing saved student courses. Run `npm run db:server`
+alongside `npm run dev`; Vite proxies `/api` requests to the loopback-only
+server. Save and load are explicit operations on the shared sample student's
+manual completed courses, and an empty save removes those courses. Other
+statuses and confirmed transcript-derived records are not deleted or overwritten.
+There is no authentication: use sample data only. This local API is not a
+production service.
 
 ## Scope not yet represented
 

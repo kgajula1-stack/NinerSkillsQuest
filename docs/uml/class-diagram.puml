@@ -37,7 +37,7 @@ class StudentCourse {
   courseId: String {FK}
   status: String = "COMPLETED"
   completedAt: DateTime?
-  transcriptCandidateId: String? {FK, UQ}
+  source: String = "MANUAL"
   createdAt: DateTime {default: now()}
   updatedAt: DateTime {updatedAt}
   --
@@ -71,27 +71,6 @@ class StudentCareerGoal {
   createdAt: DateTime {default: now()}
   updatedAt: DateTime {updatedAt}
 }
-class Transcript {
-  id: String {PK, cuid()}
-  studentId: String {FK}
-  originalFileName: String
-  mediaType: String
-  sizeBytes: Int
-  storageKey: String {UQ}
-  status: String = "UPLOADED"
-  uploadedAt: DateTime {default: now()}
-  reviewedAt: DateTime?
-}
-class TranscriptCourseCandidate {
-  id: String {PK, cuid()}
-  transcriptId: String {FK}
-  rawCourseCode: String
-  rawCourseTitle: String?
-  matchedCourseId: String? {FK}
-  reviewStatus: String = "PENDING"
-  createdAt: DateTime {default: now()}
-  updatedAt: DateTime {updatedAt}
-}
 class CourseRecommendation {
   id: String {PK, cuid()}
   skillId: String {FK}
@@ -121,21 +100,13 @@ Skill "1" -- "0..*" RoadmapSkill
 Student "1" -- "0..1" StudentCareerGoal
 CareerRoadmap "0..1" -- "0..*" StudentCareerGoal
 EmployerProfile "0..1" -- "0..*" StudentCareerGoal
-Student "1" -- "0..*" Transcript
-Transcript "1" -- "0..*" TranscriptCourseCandidate
-Course "0..1" -- "0..*" TranscriptCourseCandidate : matched course
-TranscriptCourseCandidate "0..1" -- "0..1" StudentCourse : accepted as
 Skill "1" -- "0..*" CourseRecommendation
 Skill "1" -- "0..*" PracticeResource
 
 note bottom of StudentCourse
   A student/course pair is unique; retakes are not modeled.
-  A linked candidate must belong to the same student and
-  match the course; a future service must enforce this.
-end note
-note bottom of Transcript
-  Only metadata and a private storage key are stored here;
-  document bytes are outside the database.
+  Only student-confirmed transcript coursework may be saved.
+  Source distinguishes it from manual course selections.
 end note
 note bottom of Skill
   Course mappings indicate possible exposure,

@@ -23,14 +23,38 @@ npm run build
 npm test
 ```
 
-## Relational persistence model
+## Database workflow
 
-The current UI still uses browser storage and does not connect to a backend.
-The proposed Prisma/SQLite schema, initial migration, entity relationships,
-and data-integrity decisions are documented in
-[docs/data-model.md](./docs/data-model.md). Use Node.js and Prisma commands
-there to validate and create the local development database. The schema is
-designed to be portable to PostgreSQL when a backend is introduced.
+The completed-course screen can explicitly save its current list to a local
+SQLite database and load it back. The normal browser-local workflow still works
+without the database server. Set up the database once from the project root:
+
+```powershell
+Copy-Item .env.example .env
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+```
+
+In separate terminals, run `npm run db:server` and `npm run dev`, then open
+the Vite URL at `http://localhost:5173`. On the courses screen, use **Save
+courses to database** to replace the shared sample student's saved list, or
+**Load courses from database** to replace the browser list. Remove a course
+and save again to delete it from the database; saving an empty list clears it.
+These actions are explicit: the existing **Save and continue** button does not
+save to the database. Database failures are displayed on the course screen.
+
+The seed creates a sample student and the illustrative courses, skills, and
+course-skill mappings from the existing catalog. It can be rerun without
+resetting the student's saved courses. All database users share one sample
+student; there is no authentication or privacy isolation. Use sample data
+only. Concurrent saves are last-write-wins. The API binds to loopback and is
+for this local demo only, not production or network deployment. The API
+expects Vite on port 5173 and is not included in the static build or preview.
+Career goals remain in browser storage.
+
+The schema, migration, and relationships are documented in
+[docs/data-model.md](./docs/data-model.md).
 
 ## Sprint 1 verification
 
@@ -40,12 +64,14 @@ submission:
 
 ```sh
 npm install
+npm run db:generate
 npm test
 npm run build
 ```
 
-The automated suite currently passes 27 tests across 5 test files, and the
-production build completes successfully with TypeScript checking enabled.
+The tests include an isolated SQLite integration workflow. The production
+build includes TypeScript checking. Configure `.env` as shown above before
+running `db:generate`.
 
 ## Usage
 
@@ -105,8 +131,8 @@ The course catalog and mappings are illustrative, not official catalog data.
 Coursework suggestions are not verified mastery, and roadmap skill targets and
 employer profiles are fictional demo data, not verified hiring requirements or
 employer endorsements. The demo session does not authenticate users or isolate
-one student's data from another. Transcript upload and backend services are not
-included yet.
+one student's data from another. Transcript upload and production backend
+services are not included yet.
 
 ## AI-use disclosure
 

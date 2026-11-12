@@ -13,19 +13,17 @@ model Student {
   updatedAt     DateTime           @updatedAt
   courseRecords StudentCourse[]
   careerGoal    StudentCareerGoal?
-  transcripts   Transcript[]
 
   @@map("students")
 }
 
 model Course {
-  id                   String                      @id
-  code                 String                      @unique
-  title                String
-  isActive             Boolean                     @default(true)
-  skillMappings        CourseSkill[]
-  studentRecords       StudentCourse[]
-  transcriptCandidates TranscriptCourseCandidate[]
+  id             String          @id
+  code           String          @unique
+  title          String
+  isActive       Boolean         @default(true)
+  skillMappings  CourseSkill[]
+  studentRecords StudentCourse[]
 
   @@map("courses")
 }
@@ -54,17 +52,16 @@ model CourseSkill {
 }
 
 model StudentCourse {
-  id                    String                     @id @default(cuid())
-  studentId             String
-  courseId              String
-  status                String                     @default("COMPLETED")
-  completedAt           DateTime?
-  transcriptCandidateId String?                    @unique
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
-  student               Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  course                Course                     @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  transcriptCandidate   TranscriptCourseCandidate? @relation("AcceptedTranscriptCourse", fields: [transcriptCandidateId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  studentId   String
+  courseId    String
+  status      String    @default("COMPLETED")
+  completedAt DateTime?
+  source      String    @default("MANUAL")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Restrict)
 
   @@unique([studentId, courseId])
   @@index([studentId, status])
@@ -121,41 +118,6 @@ model StudentCareerGoal {
   @@index([roadmapId])
   @@index([employerProfileId])
   @@map("student_career_goals")
-}
-
-model Transcript {
-  id               String                      @id @default(cuid())
-  studentId        String
-  originalFileName String
-  mediaType        String
-  sizeBytes        Int
-  storageKey       String                      @unique
-  status           String                      @default("UPLOADED")
-  uploadedAt       DateTime                    @default(now())
-  reviewedAt       DateTime?
-  student          Student                     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  candidates       TranscriptCourseCandidate[]
-
-  @@index([studentId, uploadedAt])
-  @@map("transcripts")
-}
-
-model TranscriptCourseCandidate {
-  id                    String         @id @default(cuid())
-  transcriptId          String
-  rawCourseCode         String
-  rawCourseTitle        String?
-  matchedCourseId       String?
-  reviewStatus          String         @default("PENDING")
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  transcript            Transcript     @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
-  matchedCourse         Course?        @relation(fields: [matchedCourseId], references: [id], onDelete: SetNull)
-  acceptedStudentCourse StudentCourse? @relation("AcceptedTranscriptCourse")
-
-  @@index([transcriptId, reviewStatus])
-  @@index([matchedCourseId])
-  @@map("transcript_course_candidates")
 }
 
 model CourseRecommendation {

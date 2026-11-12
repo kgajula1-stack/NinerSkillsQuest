@@ -2,6 +2,7 @@ import { courses, skillsById } from "./data/catalog";
 import { careerRoadmaps, employerProfiles } from "./data/careerGoals";
 import { careerGoalStore } from "./state/careerGoalStore";
 import { courseSelectionStore } from "./state/courseSelectionStore";
+import { requestDatabaseCourses } from "./state/databaseCourses";
 import { demoSessionStore } from "./state/demoSessionStore";
 import { getRecommendationsForSkill } from "./data/recommendations";
 import { compareTargetSkills } from "./data/skillGap";
@@ -20,6 +21,8 @@ const root = getApplicationRoot();
 const announcer = document.querySelector<HTMLDivElement>("#announcer");
 let searchQuery = "";
 let draftCourseId = "";
+let databaseBusy = false;
+let databaseMessage = "";
 
 type AppPage = "career-goal" | "courses" | "skill-review";
 
@@ -121,6 +124,8 @@ function render(focusTarget?: string): void {
   }
 
   const activePage = getActivePage();
+  const careerGoal = careerGoalStore.getState();
+  const startingPointLabel = careerGoal.selectedRoadmap?.name ?? "career";
   const pageHeading = {
     "career-goal": {
       title: "Choose your career goal",
@@ -128,7 +133,7 @@ function render(focusTarget?: string): void {
     },
     courses: {
       title: "Add what you already know",
-      description: "Add completed courses and review their suggested skills.",
+      description: `Build your ${escapeHtml(startingPointLabel)} starting point.`,
     },
     "skill-review": {
       title: "Review your skills",
@@ -136,8 +141,6 @@ function render(focusTarget?: string): void {
     },
   }[activePage];
   const state = courseSelectionStore.getState();
-  const careerGoal = careerGoalStore.getState();
-  const startingPointLabel = careerGoal.selectedRoadmap?.name ?? "career";
   const selectedIds = new Set(state.completedCourseIds);
   const availableCourses = courses.filter((course) => !selectedIds.has(course.id));
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -209,13 +212,8 @@ function render(focusTarget?: string): void {
     <main class="app-shell" aria-labelledby="page-title">
       <header class="panel-heading">
         <div>
-<<<<<<< Updated upstream
-          <h1 id="page-title">Add what you already know</h1>
-          <p>Build your ${escapeHtml(startingPointLabel)} starting point.</p>
-=======
           <h1 id="page-title">${pageHeading.title}</h1>
           <p>${pageHeading.description}</p>
->>>>>>> Stashed changes
         </div>
         <div class="session-controls">
           <span class="demo-badge">Local demo session</span>
@@ -489,6 +487,15 @@ function render(focusTarget?: string): void {
               : `<p class="mapped-empty">No courses selected yet. Add a supported course to see its mapped skills.</p>`
         }
       </section>
+      <section class="database-workflow" aria-labelledby="database-title">
+        <h2 id="database-title">Shared demo database</h2>
+        <p>Save replaces the shared sample student's database list. Load replaces this browser's list. Use sample data only.</p>
+        <div class="database-actions">
+          <button class="button button-secondary" type="button" data-database-action="save" ${databaseBusy ? "disabled" : ""}>Save courses to database</button>
+          <button class="button button-secondary" type="button" data-database-action="load" ${databaseBusy ? "disabled" : ""}>Load courses from database</button>
+        </div>
+        ${databaseMessage ? `<p role="status">${escapeHtml(databaseMessage)}</p>` : ""}
+      </section>
       </section>
 
       <section
@@ -707,6 +714,37 @@ function render(focusTarget?: string): void {
           announce(`Removed ${course.code} — ${course.title}.`);
         }
       }
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-database-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.databaseAction;
+      if (action !== "save" && action !== "load") return;
+      const originalIds = courseSelectionStore.getState().completedCourseIds;
+      databaseBusy = true;
+      databaseMessage = action === "save" ? "Saving courses to the database..." : "Loading courses from the database...";
+      render();
+      void requestDatabaseCourses(action === "save" ? originalIds : undefined).then((ids) => {
+        if (action === "load") {
+          if (JSON.stringify(courseSelectionStore.getState().completedCourseIds) !== JSON.stringify(originalIds)) {
+            databaseMessage = "The browser list changed while loading; it was not replaced. Try again.";
+          } else {
+            courseSelectionStore.replaceCourses(ids);
+            databaseMessage = "Courses loaded from the shared demo database.";
+          }
+        } else {
+          databaseMessage = JSON.stringify(courseSelectionStore.getState().completedCourseIds) === JSON.stringify(originalIds)
+            ? "Course list saved to the shared demo database."
+            : "The earlier course list was saved, but this browser's list has since changed. Save again to update the database.";
+        }
+      }).catch((error: unknown) => {
+        databaseMessage = `Database ${action} failed: ${error instanceof Error ? error.message : "Unknown error."} Check that the database server is running.`;
+      }).finally(() => {
+        databaseBusy = false;
+        render();
+        announce(databaseMessage);
+      });
     });
   });
 

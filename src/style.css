@@ -750,6 +750,28 @@ select {
   line-height: 1.4;
 }
 
+.database-workflow {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.database-workflow h2,
+.database-workflow p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.database-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
