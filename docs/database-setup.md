@@ -43,6 +43,7 @@ After the database choice is approved, each team member will document:
 
 | Team member | Operation | Result |
 | --- | --- | --- |
+| Rithik Neil Epuru (local PostgreSQL 17) | Prisma migration status; API GET (200); invalid-input rejection (400); completed-course POST (201); SQL record verification; API retrieval (200) | Passed |
 | To be completed | Connect and create a test record | Pending |
 | To be completed | Retrieve the test record | Pending |
 | To be completed | Update or remove a test record | Pending |
