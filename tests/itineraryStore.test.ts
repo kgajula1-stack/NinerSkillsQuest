@@ -2,10 +2,76 @@ import { describe, expect, it, vi } from "vitest";
 import { ItineraryStore } from "../src/state/itineraryStore";
 import { itineraryRecommendations } from "../src/data/itineraryRecommendations";
 
-const activity = itineraryRecommendations[0];
+const activity = { ...itineraryRecommendations[0], completed: false };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 describe("saved itinerary", () => {
+  it("persists completion and undo, counts progress, and reopens the saved state", async () => {
+    const second = { ...itineraryRecommendations[1], completed: false };
+    const done = { ...activity, completed: true };
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(reply([activity, second]))
+      .mockResolvedValueOnce(reply([done, second]))
+      .mockResolvedValueOnce(reply([done, second]))
+      .mockResolvedValueOnce(reply([activity, second]))
+      .mockResolvedValueOnce(reply([second]));
+    const store = new ItineraryStore(request);
+    await store.load();
+    expect(store.getState().completedCount).toBe(0);
+    await store.setCompleted(activity.id, true);
+    expect(store.getState().completedCount).toBe(1);
+    expect(store.getState().message).toContain("Progress saved");
+    expect(request.mock.calls[1]).toEqual([
+      `/api/itinerary/${encodeURIComponent(activity.id)}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: true }) },
+    ]);
+    const reopened = new ItineraryStore(request);
+    await reopened.load();
+    expect(reopened.getState().completedCount).toBe(1);
+    expect(reopened.getState().activities[0].completed).toBe(true);
+    await reopened.setCompleted(activity.id, false);
+    expect(reopened.getState().completedCount).toBe(0);
+    expect(reopened.getState().message).toContain("incomplete");
+    await reopened.remove(activity.id);
+    expect(reopened.getState().activities).toHaveLength(1);
+  });
+
+  it("retains completion and counts after a failed update, then permits retry", async () => {
+    const done = { ...activity, completed: true };
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(reply([activity]))
+      .mockResolvedValueOnce(reply({}, 500))
+      .mockResolvedValueOnce(reply([done]))
+      .mockResolvedValueOnce(reply([]));
+    const store = new ItineraryStore(request);
+    await store.load();
+    await store.setCompleted(activity.id, true);
+    expect(store.getState().activities[0].completed).toBe(false);
+    expect(store.getState().completedCount).toBe(0);
+    expect(store.getState().failed).toBe(true);
+    expect(store.getState().message).toContain("retry");
+    await store.setCompleted(activity.id, true);
+    expect(store.getState().completedCount).toBe(1);
+    await store.remove(activity.id);
+    expect(store.getState().completedCount).toBe(0);
+    expect(store.getState().activities).toHaveLength(0);
+  });
+
+  it("does not update unsaved activities or accept invalid completion data", async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(reply([{ ...activity, completed: "true" }]))
+      .mockResolvedValueOnce(reply([]));
+    const store = new ItineraryStore(request);
+    await store.setCompleted(activity.id, true);
+    expect(request).not.toHaveBeenCalled();
+    await store.load();
+    expect(store.getState().loaded).toBe(false);
+    await store.load();
+    await store.setCompleted(activity.id, true);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(store.getState().completedCount).toBe(0);
+  });
+
   it("adapts all activity types with unique stable IDs and skill metadata", () => {
     expect(new Set(itineraryRecommendations.map((item) => item.type)).size).toBe(3);
     expect(new Set(itineraryRecommendations.map((item) => item.id)).size).toBe(itineraryRecommendations.length);

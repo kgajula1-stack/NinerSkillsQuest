@@ -810,3 +810,6 @@ select {
 .itinerary-activity p { margin: 0.5rem 0; }
 .itinerary-activity a { overflow-wrap: anywhere; }
 .itinerary-feedback { margin: 1rem 0; }
+
+.itinerary-activity.is-complete { border-left: 5px solid #176345; }
+.activity-status, .itinerary-progress { font-weight: 700; }

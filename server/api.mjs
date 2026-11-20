@@ -42,7 +42,7 @@ export function createApiServer({
       include: { recommendation: true },
       orderBy: [{ createdAt: "asc" }, { recommendationId: "asc" }],
     });
-    return activities.map(({ recommendation }) => recommendation);
+    return activities.map(({ recommendation, completed }) => ({ ...recommendation, completed }));
   }
 
   return createServer(async (request, response) => {
@@ -50,7 +50,7 @@ export function createApiServer({
       response.writeHead(204, {
         "Access-Control-Allow-Origin": "http://localhost:5173",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
       });
       response.end();
       return;
@@ -86,6 +86,23 @@ export function createApiServer({
         return;
       }
       const itineraryMatch = url.pathname.match(/^\/api\/itinerary\/([^/]+)$/);
+      if (itineraryMatch && request.method === "PATCH") {
+        const body = await readJson(request);
+        if (typeof body?.completed !== "boolean") {
+          sendJson(response, 400, { error: "completed must be true or false." });
+          return;
+        }
+        const result = await prismaClient.itineraryActivity.updateMany({
+          where: { studentId, recommendationId: decodeURIComponent(itineraryMatch[1]) },
+          data: { completed: body.completed },
+        });
+        if (result.count === 0) {
+          sendJson(response, 404, { error: "Saved activity not found. Reload your itinerary." });
+          return;
+        }
+        sendJson(response, 200, await getItinerary());
+        return;
+      }
       if (itineraryMatch && request.method === "DELETE") {
         await prismaClient.itineraryActivity.deleteMany({
           where: { studentId, recommendationId: decodeURIComponent(itineraryMatch[1]) },

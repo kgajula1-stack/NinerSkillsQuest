@@ -15,10 +15,16 @@ test("itinerary HTTP contract: types, retries, restart, removal and student scop
       findMany: async ({ where }) => {
         if (fail) throw new Error("Simulated database failure");
         return rows.filter((row) => row.studentId === where.studentId)
-          .map((row) => ({ recommendation: recommendations.find((item) => item.id === row.recommendationId) }));
+          .map((row) => ({ completed: row.completed, recommendation: recommendations.find((item) => item.id === row.recommendationId) }));
       },
       upsert: async ({ create }) => {
-        if (!rows.some((row) => row.studentId === create.studentId && row.recommendationId === create.recommendationId)) rows.push(create);
+        if (!rows.some((row) => row.studentId === create.studentId && row.recommendationId === create.recommendationId)) rows.push({ ...create, completed: false });
+      },
+      updateMany: async ({ where, data }) => {
+        if (fail) throw new Error("Simulated database failure");
+        const selected = rows.filter((row) => row.studentId === where.studentId && row.recommendationId === where.recommendationId);
+        selected.forEach((row) => Object.assign(row, data));
+        return { count: selected.length };
       },
       deleteMany: async ({ where }) => {
         for (let index = rows.length - 1; index >= 0; index--) {
@@ -38,25 +44,51 @@ test("itinerary HTTP contract: types, retries, restart, removal and student scop
     await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
   }
   const save = (id) => fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recommendationId: id }) });
+  const complete = (id, completed) => fetch(`${base}/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed }),
+  });
   try {
     await start();
     assert.deepEqual(await (await fetch(base)).json(), []);
     for (const item of recommendations) assert.equal((await save(item.id)).status, 200);
+    assert.ok((await (await fetch(base)).json()).every((activity) => activity.completed === false));
     await Promise.all([save(recommendations[0].id), save(recommendations[0].id)]);
     assert.equal(rows.length, 3);
     assert.equal((await save("unknown")).status, 400);
     assert.equal((await save(null)).status, 400);
     assert.equal((await fetch(base, { method: "POST", body: "{" })).status, 400);
+    for (const invalid of ["true", 1, null, undefined]) {
+      assert.equal((await complete(recommendations[0].id, invalid)).status, 400);
+    }
+    assert.equal((await complete("unknown", true)).status, 404);
+    for (const item of recommendations) {
+      const completed = await complete(item.id, true);
+      assert.equal(completed.status, 200);
+      assert.equal((await completed.json()).find((activity) => activity.id === item.id).completed, true);
+    }
+    await complete(recommendations[0].id, true);
+    await save(recommendations[0].id);
+    assert.equal(rows.length, 3);
+    assert.ok(rows.every((row) => row.completed));
     await stop();
     await start();
-    assert.deepEqual(await (await fetch(base)).json(), recommendations);
+    assert.deepEqual(await (await fetch(base)).json(), recommendations.map((activity) => ({ ...activity, completed: true })));
     await stop();
     await start("student-b");
     assert.deepEqual(await (await fetch(base)).json(), []);
+    assert.equal((await complete(recommendations[0].id, false)).status, 404);
+    assert.ok(rows.every((row) => row.completed));
     await fetch(`${base}/${encodeURIComponent(recommendations[0].id)}`, { method: "DELETE" });
     assert.equal(rows.length, 3);
     await stop();
     await start();
+    fail = true;
+    assert.equal((await complete(recommendations[0].id, false)).status, 500);
+    assert.ok(rows.every((row) => row.completed));
+    fail = false;
+    assert.equal((await complete(recommendations[0].id, false)).status, 200);
+    assert.equal(rows[0].completed, false);
+    assert.deepEqual(Object.keys(rows[0]).sort(), ["completed", "recommendationId", "studentId"]);
     for (const item of recommendations) {
       assert.equal((await fetch(`${base}/${encodeURIComponent(item.id)}`, { method: "DELETE" })).status, 200);
     }

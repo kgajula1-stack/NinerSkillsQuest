@@ -136,6 +136,7 @@ model ItineraryActivity {
   studentId        String         @db.Uuid
   recommendationId String
   createdAt        DateTime       @default(now())
+  completed        Boolean        @default(false)
   student          Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
   recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
 

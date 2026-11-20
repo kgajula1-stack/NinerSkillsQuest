@@ -101,11 +101,18 @@ function renderActivity(activity: ItineraryRecommendation, saved: boolean): stri
   const itinerary = itineraryStore.getState();
   const alreadySaved = itinerary.activities.some((item) => item.id === activity.id);
   const actionId = itineraryRecommendations.findIndex((item) => item.id === activity.id);
-  return `<li class="itinerary-activity">
+  const completed = itinerary.activities.find((item) => item.id === activity.id)?.completed ?? false;
+  return `<li class="itinerary-activity ${saved && completed ? "is-complete" : ""}">
     <div><h3>${escapeHtml(activity.title)}</h3>
       <p>${activityTypeLabels[activity.type]} · ${escapeHtml(skillsById.get(activity.skillId)?.name ?? activity.skillId)}</p>
+      ${saved ? `<p class="activity-status">${completed ? "Complete" : "Incomplete"}</p>` : ""}
       ${activity.url ? `<a href="${escapeHtml(activity.url)}" target="_blank" rel="noreferrer">Open resource<span class="sr-only"> for ${escapeHtml(activity.title)}</span></a>` : "<p>No resource link available.</p>"}
     </div>
+    ${saved ? `<button class="button button-secondary" type="button"
+      data-complete-activity="${escapeHtml(activity.id)}" data-completed="${!completed}"
+      data-focus-target="complete-activity-${actionId}"
+      aria-label="Mark ${escapeHtml(activity.title)} ${completed ? "incomplete" : "complete"}"
+      ${itinerary.busy ? "disabled" : ""}>Mark ${completed ? "incomplete" : "complete"}</button>` : ""}
     <button class="button button-secondary" type="button"
       ${saved ? 'data-remove-activity' : 'data-save-activity'}="${escapeHtml(activity.id)}"
       data-focus-target="${saved ? 'remove' : 'save'}-activity-${actionId}"
@@ -594,6 +601,8 @@ function render(focusTarget?: string): void {
 
       <section class="feature-page" aria-labelledby="itinerary-title" ${activePage !== "dashboard" ? "hidden" : ""}>
         <h2 id="itinerary-title">Saved activities · ${itinerary.activities.length}</h2>
+        ${itinerary.loaded ? `<p class="itinerary-progress">${itinerary.completedCount} of ${itinerary.activities.length} activities complete</p>` : ""}
+        <p>Completion is self-reported. It does not verify skill mastery or award a quest badge.</p>
         <p>Saved for the demo student in the database. This prototype uses a shared demo account.</p>
         ${itinerary.activities.length ? `<ul class="itinerary-list">${itinerary.activities.map((activity) => renderActivity(activity, true)).join("")}</ul>`
           : `<p>${itinerary.busy ? "Loading saved activities…" : itinerary.loaded ? "No saved activities yet. Choose a recommendation in Skill review to start your itinerary." : "Load your itinerary to see saved activities."}</p>`}
@@ -634,6 +643,15 @@ function render(focusTarget?: string): void {
 
   root.querySelector<HTMLButtonElement>(".reload-itinerary")?.addEventListener("click", () => {
     void itineraryStore.load();
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-complete-activity]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.completeActivity;
+      if (!id) return;
+      await itineraryStore.setCompleted(id, button.dataset.completed === "true");
+      render(button.dataset.focusTarget);
+      announce(itineraryStore.getState().message ?? "Itinerary updated.");
+    });
   });
   root.querySelectorAll<HTMLButtonElement>("[data-save-activity], [data-remove-activity]").forEach((button) => {
     button.addEventListener("click", async () => {

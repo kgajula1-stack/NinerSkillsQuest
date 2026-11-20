@@ -1,7 +1,12 @@
 import type { ItineraryRecommendation } from "../data/itineraryRecommendations";
 
+export interface SavedItineraryActivity extends ItineraryRecommendation {
+  completed: boolean;
+}
+
 export interface ItineraryState {
-  activities: ItineraryRecommendation[];
+  activities: SavedItineraryActivity[];
+  completedCount: number;
   busy: boolean;
   loaded: boolean;
   message: string | null;
@@ -10,14 +15,18 @@ export interface ItineraryState {
 
 export class ItineraryStore {
   private state: ItineraryState = {
-    activities: [], busy: false, loaded: false, message: null, failed: false,
+    activities: [], completedCount: 0, busy: false, loaded: false, message: null, failed: false,
   };
   private listeners = new Set<() => void>();
 
   constructor(private readonly request: typeof fetch = fetch) {}
 
   getState(): ItineraryState {
-    return { ...this.state, activities: this.state.activities.map((activity) => ({ ...activity })) };
+    return {
+      ...this.state,
+      completedCount: this.state.activities.filter((activity) => activity.completed).length,
+      activities: this.state.activities.map((activity) => ({ ...activity })),
+    };
   }
 
   subscribe(listener: () => void): () => void {
@@ -42,6 +51,16 @@ export class ItineraryStore {
   remove(id: string): Promise<void> {
     return this.run(`/api/itinerary/${encodeURIComponent(id)}`, { method: "DELETE" },
       "Activity removed from your itinerary.");
+  }
+
+  setCompleted(id: string, completed: boolean): Promise<void> {
+    if (!this.state.loaded || !this.state.activities.some((activity) => activity.id === id)) {
+      return Promise.resolve();
+    }
+    return this.run(`/api/itinerary/${encodeURIComponent(id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed }),
+    }, completed ? "Activity marked complete. Progress saved." : "Activity marked incomplete. Progress saved.");
   }
 
   private async run(url: string, options: RequestInit | undefined, success: string | null): Promise<void> {
@@ -76,10 +95,11 @@ export class ItineraryStore {
   }
 }
 
-function isActivity(value: unknown): value is ItineraryRecommendation {
+function isActivity(value: unknown): value is SavedItineraryActivity {
   if (typeof value !== "object" || value === null) return false;
   const activity = value as Record<string, unknown>;
   return ["id", "title", "skillId", "url"].every((key) => typeof activity[key] === "string")
+    && typeof activity.completed === "boolean"
     && ["elective", "project", "practice-resource"].includes(String(activity.type))
     && (activity.url === "" || /^https?:\/\//i.test(String(activity.url)));
 }

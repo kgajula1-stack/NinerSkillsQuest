@@ -96,6 +96,13 @@ test("course API persists selections and validates database operations", async (
       assert.equal((await saveActivity()).status, 200);
     }
     assert.equal(await prisma.itineraryActivity.count({ where: { studentId } }), 3);
+    const initialActivities = await (await fetch(`${baseUrl}/api/itinerary`)).json();
+    assert.ok(initialActivities.every((activity) => activity.completed === false));
+    const setCompleted = (recommendationId, completed) => fetch(
+      `${baseUrl}/api/itinerary/${encodeURIComponent(recommendationId)}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed }) },
+    );
+    assert.equal((await setCompleted(recommendationIds[0], true)).status, 200);
 
     await stopServer();
     await startServer();
@@ -110,6 +117,10 @@ test("course API persists selections and validates database operations", async (
     const restoredActivities = await (await fetch(`${baseUrl}/api/itinerary`)).json();
     assert.deepEqual(restoredActivities.map((activity) => activity.id).sort(), [...recommendationIds].sort());
     assert.ok(restoredActivities.every((activity) => activity.title && activity.type && activity.skillId && activity.url));
+    assert.equal(restoredActivities.filter((activity) => activity.completed).length, 1);
+    assert.equal(restoredActivities.find((activity) => activity.id === recommendationIds[0]).completed, true);
+    assert.equal((await setCompleted(recommendationIds[0], false)).status, 200);
+    assert.equal(await prisma.itineraryActivity.count({ where: { studentId, completed: true } }), 0);
     for (const recommendationId of recommendationIds) {
       const removal = await fetch(`${baseUrl}/api/itinerary/${encodeURIComponent(recommendationId)}`, { method: "DELETE" });
       assert.equal(removal.status, 200);

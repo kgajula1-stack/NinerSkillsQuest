@@ -41,7 +41,7 @@ npm run test:db
 The test uses a temporary student and removes it during cleanup. Point
 `DATABASE_URL_TEST` at a test database, not a shared or production database.
 
-Issue #9 verification: 39 unit tests pass across 9 files; the itinerary HTTP
+Issue #15 verification: 42 unit tests pass across 9 files; the itinerary HTTP
 adapter test, lint, and the TypeScript/Vite production build pass. The expanded
 PostgreSQL integration test requires a migrated, seeded test database.
 
@@ -63,6 +63,13 @@ resource link, and **Remove** button. Saved activities reopen after refresh and
 returning to the dashboard, independently of changes to your goal or courses.
 Saving is immediate; **Save and continue** is not needed for itinerary activities.
 Failures show retry instructions and **Reload itinerary** when needed.
+
+On the Dashboard, use **Mark complete** or **Mark incomplete** on any saved
+activity. Its text status and the completed/total count update after the save
+succeeds and persist when you return or refresh. Completion is self-reported;
+it does not award XP, a verified badge, or recorded skill mastery. Existing and
+newly saved activities start incomplete. See the
+[issue #15 review notes](./docs/issue_details/issue-15-test-results.md).
 
 The itinerary uses the API's existing fixed demo student. Storage is scoped by
 student ID on the server; authenticated account selection remains future work.
