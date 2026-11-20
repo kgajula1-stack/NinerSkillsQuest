@@ -103,6 +103,12 @@ test("course API persists selections and validates database operations", async (
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed }) },
     );
     assert.equal((await setCompleted(recommendationIds[0], true)).status, 200);
+    const chosenOrder = [...recommendationIds].reverse();
+    const reorderResponse = await fetch(`${baseUrl}/api/itinerary/order`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recommendationIds: chosenOrder }),
+    });
+    assert.equal(reorderResponse.status, 200);
 
     await stopServer();
     await startServer();
@@ -115,6 +121,7 @@ test("course API persists selections and validates database operations", async (
     );
 
     const restoredActivities = await (await fetch(`${baseUrl}/api/itinerary`)).json();
+    assert.deepEqual(restoredActivities.map((activity) => activity.id), chosenOrder);
     assert.deepEqual(restoredActivities.map((activity) => activity.id).sort(), [...recommendationIds].sort());
     assert.ok(restoredActivities.every((activity) => activity.title && activity.type && activity.skillId && activity.url));
     assert.equal(restoredActivities.filter((activity) => activity.completed).length, 1);

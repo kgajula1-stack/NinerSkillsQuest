@@ -6,6 +6,43 @@ const activity = { ...itineraryRecommendations[0], completed: false };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 describe("saved itinerary", () => {
+  it("moves immediately, saves and reloads order, and rolls back a failed move", async () => {
+    const second = { ...itineraryRecommendations[1], completed: true };
+    let finish!: (value: Response) => void;
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(reply([activity, second]))
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValueOnce(reply([second, activity]))
+      .mockResolvedValueOnce(reply({}, 500));
+    const store = new ItineraryStore(request);
+    await store.load();
+    const moving = store.move(second.id, -1);
+    expect(store.getState().activities.map((item) => item.id)).toEqual([second.id, activity.id]);
+    expect(store.getState().completedCount).toBe(1);
+    expect(store.getState().busy).toBe(true);
+    finish(reply([second, activity]));
+    await moving;
+    expect(JSON.parse(String(request.mock.calls[1][1]?.body))).toEqual({ recommendationIds: [second.id, activity.id] });
+    const reopened = new ItineraryStore(request);
+    await reopened.load();
+    expect(reopened.getState().activities.map((item) => item.id)).toEqual([second.id, activity.id]);
+    await reopened.move(second.id, 1);
+    expect(reopened.getState().activities.map((item) => item.id)).toEqual([second.id, activity.id]);
+    expect(reopened.getState().failed).toBe(true);
+  });
+
+  it("ignores moves for empty, single-item, unknown and boundary positions", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply([])).mockResolvedValueOnce(reply([activity]));
+    const store = new ItineraryStore(request);
+    await store.move(activity.id, 1);
+    await store.load();
+    await store.move(activity.id, 1);
+    await store.load();
+    await store.move(activity.id, -1);
+    await store.move(activity.id, 1);
+    await store.move("unknown", 1);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
   it("persists completion and undo, counts progress, and reopens the saved state", async () => {
     const second = { ...itineraryRecommendations[1], completed: false };
     const done = { ...activity, completed: true };

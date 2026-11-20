@@ -40,7 +40,7 @@ export function createApiServer({
     const activities = await prismaClient.itineraryActivity.findMany({
       where: { studentId },
       include: { recommendation: true },
-      orderBy: [{ createdAt: "asc" }, { recommendationId: "asc" }],
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }, { recommendationId: "asc" }],
     });
     return activities.map(({ recommendation, completed }) => ({ ...recommendation, completed }));
   }
@@ -62,6 +62,28 @@ export function createApiServer({
         sendJson(response, 200, await getItinerary());
         return;
       }
+      if (url.pathname === "/api/itinerary/order" && request.method === "PATCH") {
+        const body = await readJson(request);
+        const ids = body?.recommendationIds;
+        if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string") || new Set(ids).size !== ids.length) {
+          sendJson(response, 400, { error: "Provide each saved activity exactly once." });
+          return;
+        }
+        const saved = await prismaClient.$transaction(async (transaction) => {
+          const activities = await transaction.itineraryActivity.findMany({ where: { studentId } });
+          if (activities.length !== ids.length || activities.some((activity) => !ids.includes(activity.recommendationId))) return false;
+          for (const [position, recommendationId] of ids.entries()) {
+            await transaction.itineraryActivity.updateMany({ where: { studentId, recommendationId }, data: { position } });
+          }
+          return true;
+        }, { isolationLevel: "Serializable" });
+        if (!saved) {
+          sendJson(response, 409, { error: "Saved activities changed. Reload your itinerary before reordering." });
+          return;
+        }
+        sendJson(response, 200, await getItinerary());
+        return;
+      }
       if (url.pathname === "/api/itinerary" && request.method === "POST") {
         const body = await readJson(request);
         const recommendationId = body?.recommendationId;
@@ -77,10 +99,11 @@ export function createApiServer({
           return;
         }
         // Idempotent saves also handle retries after a lost response.
+        const last = await prismaClient.itineraryActivity.aggregate({ where: { studentId }, _max: { position: true } });
         await prismaClient.itineraryActivity.upsert({
           where: { studentId_recommendationId: { studentId, recommendationId } },
           update: {},
-          create: { studentId, recommendationId },
+          create: { studentId, recommendationId, position: (last._max.position ?? -1) + 1 },
         });
         sendJson(response, 200, await getItinerary());
         return;

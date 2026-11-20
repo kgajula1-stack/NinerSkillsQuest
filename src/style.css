@@ -813,3 +813,4 @@ select {
 
 .itinerary-activity.is-complete { border-left: 5px solid #176345; }
 .activity-status, .itinerary-progress { font-weight: 700; }
+.activity-order-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }

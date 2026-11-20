@@ -41,7 +41,7 @@ npm run test:db
 The test uses a temporary student and removes it during cleanup. Point
 `DATABASE_URL_TEST` at a test database, not a shared or production database.
 
-Issue #15 verification: 42 unit tests pass across 9 files; the itinerary HTTP
+Issue #14 verification: 44 unit tests pass across 9 files; the itinerary HTTP
 adapter test, lint, and the TypeScript/Vite production build pass. The expanded
 PostgreSQL integration test requires a migrated, seeded test database.
 
@@ -70,6 +70,11 @@ succeeds and persist when you return or refresh. Completion is self-reported;
 it does not award XP, a verified badge, or recorded skill mastery. Existing and
 newly saved activities start incomplete. See the
 [issue #15 review notes](./docs/issue_details/issue-15-test-results.md).
+
+Use **Move earlier** / **Move later** to prioritize saved activities. The first
+incomplete activity in your chosen order is labeled **Next activity**. Order
+saves immediately and survives refresh; a failed save restores the previous
+order. See the [issue #14 review notes](./docs/issue_details/issue-14-test-results.md).
 
 The itinerary uses the API's existing fixed demo student. Storage is scoped by
 student ID on the server; authenticated account selection remains future work.

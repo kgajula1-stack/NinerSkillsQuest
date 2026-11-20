@@ -63,8 +63,22 @@ export class ItineraryStore {
     }, completed ? "Activity marked complete. Progress saved." : "Activity marked incomplete. Progress saved.");
   }
 
-  private async run(url: string, options: RequestInit | undefined, success: string | null): Promise<void> {
+  move(id: string, direction: -1 | 1): Promise<void> {
+    const activities = [...this.state.activities];
+    const index = activities.findIndex((activity) => activity.id === id);
+    const destination = index + direction;
+    if (!this.state.loaded || this.state.busy || index < 0 || destination < 0 || destination >= activities.length) return Promise.resolve();
+    [activities[index], activities[destination]] = [activities[destination], activities[index]];
+    return this.run("/api/itinerary/order", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recommendationIds: activities.map((activity) => activity.id) }),
+    }, "Activity order saved.", activities);
+  }
+
+  private async run(url: string, options: RequestInit | undefined, success: string | null, optimistic?: SavedItineraryActivity[]): Promise<void> {
     if (this.state.busy) return;
+    const previous = this.state.activities;
+    if (optimistic) this.state.activities = optimistic;
     this.state.busy = true;
     this.state.message = "Loading itinerary…";
     this.notify();
@@ -80,6 +94,7 @@ export class ItineraryStore {
       this.state.message = success;
       this.state.failed = false;
     } catch {
+      if (optimistic) this.state.activities = previous;
       this.state.failed = true;
       this.state.message = options
         ? "Change could not be confirmed. Check that the API and database are running, then retry the action."

@@ -102,12 +102,23 @@ function renderActivity(activity: ItineraryRecommendation, saved: boolean): stri
   const alreadySaved = itinerary.activities.some((item) => item.id === activity.id);
   const actionId = itineraryRecommendations.findIndex((item) => item.id === activity.id);
   const completed = itinerary.activities.find((item) => item.id === activity.id)?.completed ?? false;
+  const index = itinerary.activities.findIndex((item) => item.id === activity.id);
+  const next = itinerary.activities.find((item) => !item.completed);
   return `<li class="itinerary-activity ${saved && completed ? "is-complete" : ""}">
     <div><h3>${escapeHtml(activity.title)}</h3>
       <p>${activityTypeLabels[activity.type]} · ${escapeHtml(skillsById.get(activity.skillId)?.name ?? activity.skillId)}</p>
       ${saved ? `<p class="activity-status">${completed ? "Complete" : "Incomplete"}</p>` : ""}
+      ${saved && next?.id === activity.id ? `<p class="activity-status">Next activity</p>` : ""}
       ${activity.url ? `<a href="${escapeHtml(activity.url)}" target="_blank" rel="noreferrer">Open resource<span class="sr-only"> for ${escapeHtml(activity.title)}</span></a>` : "<p>No resource link available.</p>"}
     </div>
+    ${saved && itinerary.activities.length > 1 ? `<div class="activity-order-controls">
+      <button class="button button-secondary" type="button" data-move-activity="${escapeHtml(activity.id)}" data-direction="-1"
+        data-focus-target="earlier-activity-${actionId}" aria-label="Move ${escapeHtml(activity.title)} earlier"
+        ${itinerary.busy || index === 0 ? "disabled" : ""}>Move earlier</button>
+      <button class="button button-secondary" type="button" data-move-activity="${escapeHtml(activity.id)}" data-direction="1"
+        data-focus-target="later-activity-${actionId}" aria-label="Move ${escapeHtml(activity.title)} later"
+        ${itinerary.busy || index === itinerary.activities.length - 1 ? "disabled" : ""}>Move later</button>
+    </div>` : ""}
     ${saved ? `<button class="button button-secondary" type="button"
       data-complete-activity="${escapeHtml(activity.id)}" data-completed="${!completed}"
       data-focus-target="complete-activity-${actionId}"
@@ -650,6 +661,16 @@ function render(focusTarget?: string): void {
       if (!id) return;
       await itineraryStore.setCompleted(id, button.dataset.completed === "true");
       render(button.dataset.focusTarget);
+      announce(itineraryStore.getState().message ?? "Itinerary updated.");
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-move-activity]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.moveActivity;
+      if (!id) return;
+      await itineraryStore.move(id, button.dataset.direction === "-1" ? -1 : 1);
+      // The move button may now be disabled at a boundary; keep focus on this activity.
+      render(`complete-activity-${itineraryRecommendations.findIndex((activity) => activity.id === id)}`);
       announce(itineraryStore.getState().message ?? "Itinerary updated.");
     });
   });
