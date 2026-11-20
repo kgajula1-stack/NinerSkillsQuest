@@ -41,7 +41,7 @@ npm run test:db
 The test uses a temporary student and removes it during cleanup. Point
 `DATABASE_URL_TEST` at a test database, not a shared or production database.
 
-Issue #14 verification: 44 unit tests pass across 9 files; the itinerary HTTP
+Issue #13 verification: 50 unit tests pass across 10 files; the itinerary HTTP
 adapter test, lint, and the TypeScript/Vite production build pass. The expanded
 PostgreSQL integration test requires a migrated, seeded test database.
 
@@ -75,6 +75,14 @@ Use **Move earlier** / **Move later** to prioritize saved activities. The first
 incomplete activity in your chosen order is labeled **Next activity**. Order
 saves immediately and survives refresh; a failed save restores the previous
 order. See the [issue #14 review notes](./docs/issue_details/issue-14-test-results.md).
+
+The Dashboard also shows career readiness as recorded skill coverage for the
+selected roadmap and employer: distinct matched target skills divided by
+distinct target skills, rounded to a whole percent. It explains the counts and
+formula and updates when recorded courses or the goal change. Missing goals,
+empty targets, and unavailable course data show guidance. This score is not a
+hiring probability or verified mastery. See the
+[issue #13 review notes](./docs/issue_details/issue-13-test-results.md).
 
 The itinerary uses the API's existing fixed demo student. Storage is scoped by
 student ID on the server; authenticated account selection remains future work.

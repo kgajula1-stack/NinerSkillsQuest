@@ -5,6 +5,7 @@ import { courseSelectionStore } from "./state/courseSelectionStore";
 import { demoSessionStore } from "./state/demoSessionStore";
 import { getRecommendationsForSkill } from "./data/recommendations";
 import { compareTargetSkills } from "./data/skillGap";
+import { calculateReadiness } from "./data/readiness";
 import { recommendationStore } from "./state/recommendationStore";
 import { itineraryStore } from "./state/itineraryStore";
 import { itineraryRecommendations, activityTypeLabels } from "./data/itineraryRecommendations";
@@ -209,6 +210,10 @@ function render(focusTarget?: string): void {
       .map((skillId) => skillsById.get(skillId))
       .filter((skill): skill is NonNullable<typeof skill> => Boolean(skill)) ?? [];
   const skillComparison = compareTargetSkills(
+    state.skills.map((skill) => skill.id),
+    careerGoal.targetProfile?.skillIds ?? null,
+  );
+  const readiness = calculateReadiness(
     state.skills.map((skill) => skill.id),
     careerGoal.targetProfile?.skillIds ?? null,
   );
@@ -610,6 +615,22 @@ function render(focusTarget?: string): void {
       }
       </section>
 
+      <section class="feature-page readiness-summary" aria-labelledby="readiness-title" ${activePage !== "dashboard" ? "hidden" : ""}>
+        <h2 id="readiness-title">Career readiness · recorded skill coverage</h2>
+        ${careerGoal.targetProfile ? `<p>Selected goal: ${escapeHtml(careerGoal.selectedRoadmap?.name ?? "")} · ${escapeHtml(careerGoal.selectedEmployer?.name ?? "")}</p>` : ""}
+        ${state.isLoading ? `<p role="status">Loading recorded skills before calculating your score…</p>`
+          : state.persistenceMessage ? `<p role="status">Readiness is unavailable because recorded courses could not be confirmed. Check that the API and database are running, then refresh.</p>`
+          : readiness.status === "missing-goal" ? `<p>Choose a career roadmap and employer to see your readiness score. <a href="#career-goal">Choose your goal</a></p>`
+          : readiness.status === "empty-target" ? `<p>This goal has no target skills yet. Choose another roadmap to see a readiness score. <a href="#career-goal">Change your goal</a></p>`
+          : `<div aria-live="polite">
+              <p class="readiness-score">${readiness.percent}%</p>
+              <meter min="0" max="100" value="${readiness.percent}" aria-label="Recorded target-skill coverage">${readiness.percent}%</meter>
+              <p>${readiness.matchedCount} of ${readiness.targetCount} distinct target skills matched.</p>
+            </div>`}
+        <p>Score = distinct matched target skills ÷ distinct target skills × 100, rounded to a whole percent. Repeated evidence counts once.</p>
+        <p>This measures recorded skill coverage, not verified mastery or hiring probability. Self-reported itinerary completion does not increase this score.</p>
+        <a href="#skill-review">Review matched and unmatched skills</a>
+      </section>
       <section class="feature-page" aria-labelledby="itinerary-title" ${activePage !== "dashboard" ? "hidden" : ""}>
         <h2 id="itinerary-title">Saved activities · ${itinerary.activities.length}</h2>
         ${itinerary.loaded ? `<p class="itinerary-progress">${itinerary.completedCount} of ${itinerary.activities.length} activities complete</p>` : ""}
