@@ -15,6 +15,7 @@ model Student {
   updatedAt       DateTime           @updatedAt
   courseSelections StudentCourse[]
   careerGoal      StudentCareerGoal?
+  itinerary       ItineraryActivity[]
 
   @@map("students")
 }
@@ -125,7 +126,20 @@ model Recommendation {
   url       String
   createdAt DateTime @default(now())
   skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  savedActivities ItineraryActivity[]
 
   @@index([skillId])
   @@map("recommendations")
+}
+
+model ItineraryActivity {
+  studentId        String         @db.Uuid
+  recommendationId String
+  createdAt        DateTime       @default(now())
+  student          Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+
+  @@id([studentId, recommendationId])
+  @@index([recommendationId])
+  @@map("itinerary_activities")
 }

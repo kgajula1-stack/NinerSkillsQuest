@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { courses, skills } from "../src/data/catalog";
 import { careerRoadmaps, employerProfiles } from "../src/data/careerGoals";
-import { recommendationCatalog } from "../src/data/recommendations";
+import { itineraryRecommendations } from "../src/data/itineraryRecommendations";
 
 const prisma = new PrismaClient();
 const DEMO_STUDENT_ID = "00000000-0000-0000-0000-000000000001";
@@ -75,44 +75,12 @@ async function main(): Promise<void> {
     });
   }
 
-  for (const recommendation of recommendationCatalog) {
-    for (const elective of recommendation.electives) {
-      await prisma.recommendation.upsert({
-        where: { id: `elective:${recommendation.skillId}:${elective.code}` },
-        update: {
-          skillId: recommendation.skillId,
-          type: "elective",
-          title: `${elective.code}: ${elective.title}`,
-          url: elective.url,
-        },
-        create: {
-          id: `elective:${recommendation.skillId}:${elective.code}`,
-          skillId: recommendation.skillId,
-          type: "elective",
-          title: `${elective.code}: ${elective.title}`,
-          url: elective.url,
-        },
-      });
-    }
-
-    for (const resource of recommendation.resources) {
-      await prisma.recommendation.upsert({
-        where: { id: `resource:${recommendation.skillId}:${resource.title}` },
-        update: {
-          skillId: recommendation.skillId,
-          type: "practice-resource",
-          title: resource.title,
-          url: resource.url,
-        },
-        create: {
-          id: `resource:${recommendation.skillId}:${resource.title}`,
-          skillId: recommendation.skillId,
-          type: "practice-resource",
-          title: resource.title,
-          url: resource.url,
-        },
-      });
-    }
+  for (const recommendation of itineraryRecommendations) {
+    await prisma.recommendation.upsert({
+      where: { id: recommendation.id },
+      update: recommendation,
+      create: recommendation,
+    });
   }
 }
 

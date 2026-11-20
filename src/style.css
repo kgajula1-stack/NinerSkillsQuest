@@ -788,3 +788,25 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.itinerary-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.itinerary-activity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #cbd5cf;
+  border-radius: 12px;
+}
+
+.itinerary-activity h3 { margin: 0; }
+.itinerary-activity p { margin: 0.5rem 0; }
+.itinerary-activity a { overflow-wrap: anywhere; }
+.itinerary-feedback { margin: 1rem 0; }

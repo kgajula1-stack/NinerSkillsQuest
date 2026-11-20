@@ -6,6 +6,9 @@ import { demoSessionStore } from "./state/demoSessionStore";
 import { getRecommendationsForSkill } from "./data/recommendations";
 import { compareTargetSkills } from "./data/skillGap";
 import { recommendationStore } from "./state/recommendationStore";
+import { itineraryStore } from "./state/itineraryStore";
+import { itineraryRecommendations, activityTypeLabels } from "./data/itineraryRecommendations";
+import type { ItineraryRecommendation } from "./data/itineraryRecommendations";
 import "./style.css";
 
 function getApplicationRoot(): HTMLDivElement {
@@ -21,11 +24,11 @@ const announcer = document.querySelector<HTMLDivElement>("#announcer");
 let searchQuery = "";
 let draftCourseId = "";
 
-type AppPage = "career-goal" | "courses" | "skill-review";
+type AppPage = "career-goal" | "courses" | "skill-review" | "dashboard";
 
 function getActivePage(): AppPage {
   const page = window.location.hash.slice(1);
-  return page === "career-goal" || page === "skill-review" ? page : "courses";
+  return page === "dashboard" || page === "career-goal" || page === "skill-review" ? page : "courses";
 }
 
 function announce(message: string): void {
@@ -94,6 +97,25 @@ function escapeHtml(value: string): string {
   });
 }
 
+function renderActivity(activity: ItineraryRecommendation, saved: boolean): string {
+  const itinerary = itineraryStore.getState();
+  const alreadySaved = itinerary.activities.some((item) => item.id === activity.id);
+  const actionId = itineraryRecommendations.findIndex((item) => item.id === activity.id);
+  return `<li class="itinerary-activity">
+    <div><h3>${escapeHtml(activity.title)}</h3>
+      <p>${activityTypeLabels[activity.type]} · ${escapeHtml(skillsById.get(activity.skillId)?.name ?? activity.skillId)}</p>
+      ${activity.url ? `<a href="${escapeHtml(activity.url)}" target="_blank" rel="noreferrer">Open resource<span class="sr-only"> for ${escapeHtml(activity.title)}</span></a>` : "<p>No resource link available.</p>"}
+    </div>
+    <button class="button button-secondary" type="button"
+      ${saved ? 'data-remove-activity' : 'data-save-activity'}="${escapeHtml(activity.id)}"
+      data-focus-target="${saved ? 'remove' : 'save'}-activity-${actionId}"
+      aria-label="${saved ? 'Remove' : 'Save'} ${escapeHtml(activity.title)}"
+      ${itinerary.busy || (!saved && (!itinerary.loaded || alreadySaved)) ? "disabled" : ""}>
+      ${saved ? "Remove" : alreadySaved ? "Saved" : "Save to itinerary"}
+    </button>
+  </li>`;
+}
+
 function render(focusTarget?: string): void {
   const session = demoSessionStore.getState();
   if (!session.signedIn) {
@@ -121,7 +143,9 @@ function render(focusTarget?: string): void {
   }
 
   const activePage = getActivePage();
+  const itinerary = itineraryStore.getState();
   const pageHeading = {
+    dashboard: { title: "Your career itinerary", description: "Reopen the next steps you saved." },
     "career-goal": {
       title: "Choose your career goal",
       description: "Choose a direction to compare your course skills against.",
@@ -218,6 +242,7 @@ function render(focusTarget?: string): void {
       </header>
 
       <nav class="page-navigation" aria-label="Main navigation">
+        <a href="#dashboard" data-focus-target="page-dashboard" ${activePage === "dashboard" ? 'aria-current="page"' : ""}>Dashboard</a>
         <a
           href="#career-goal"
           data-focus-target="page-career-goal"
@@ -546,42 +571,11 @@ function render(focusTarget?: string): void {
               ${
                 selectedRecommendation
                   ? `
-                    <div class="recommendation-panel">
-                      <div class="recommendation-group">
-                        <h3>UNC Charlotte electives</h3>
-                        ${
-                          selectedRecommendation.electives.length > 0
-                            ? `<ul class="skill-tags">
-                                ${selectedRecommendation.electives
-                                  .map(
-                                    (course) => `
-                                      <li>
-                                        <a href="${escapeHtml(course.url)}" target="_blank" rel="noreferrer">${escapeHtml(course.code)} — ${escapeHtml(course.title)}</a>
-                                      </li>`,
-                                  )
-                                  .join("")}
-                              </ul>`
-                            : `<p class="mapped-empty">No UNC Charlotte electives are available for this skill yet.</p>`
-                        }
-                      </div>
-                      <div class="recommendation-group">
-                        <h3>Practice resources</h3>
-                        ${
-                          selectedRecommendation.resources.length > 0
-                            ? `<ul class="skill-tags goal-skill-tags">
-                                ${selectedRecommendation.resources
-                                  .map(
-                                    (resource) => `
-                                      <li>
-                                        <a href="${escapeHtml(resource.url)}" target="_blank" rel="noreferrer">${escapeHtml(resource.title)}</a>
-                                      </li>`,
-                                  )
-                                  .join("")}
-                              </ul>`
-                            : `<p class="mapped-empty">No practice resources are available for this selected skill yet.</p>`
-                        }
-                      </div>
-                    </div>
+                    <p>Illustrative course and project suggestions. Check current catalog availability and prerequisites.</p>
+                    <ul class="itinerary-list">
+                      ${itineraryRecommendations.filter((activity) => activity.skillId === selectedMissingSkillId)
+                        .map((activity) => renderActivity(activity, false)).join("")}
+                    </ul>
                   `
                   : `<p class="mapped-empty">No course or resource is available for this selected skill.</p>`
               }
@@ -598,6 +592,17 @@ function render(focusTarget?: string): void {
       }
       </section>
 
+      <section class="feature-page" aria-labelledby="itinerary-title" ${activePage !== "dashboard" ? "hidden" : ""}>
+        <h2 id="itinerary-title">Saved activities · ${itinerary.activities.length}</h2>
+        <p>Saved for the demo student in the database. This prototype uses a shared demo account.</p>
+        ${itinerary.activities.length ? `<ul class="itinerary-list">${itinerary.activities.map((activity) => renderActivity(activity, true)).join("")}</ul>`
+          : `<p>${itinerary.busy ? "Loading saved activities…" : itinerary.loaded ? "No saved activities yet. Choose a recommendation in Skill review to start your itinerary." : "Load your itinerary to see saved activities."}</p>`}
+        <a href="#skill-review">Find recommendations</a>
+      </section>
+      <div class="itinerary-feedback">
+        <p role="status" aria-live="polite">${escapeHtml(itinerary.message ?? "")}</p>
+        ${itinerary.failed || !itinerary.loaded ? `<button class="button button-secondary reload-itinerary" data-focus-target="reload-itinerary" type="button" ${itinerary.busy ? "disabled" : ""}>Reload itinerary</button>` : ""}
+      </div>
       <button class="button button-primary save-button" type="button">
         Save and continue →
       </button>
@@ -626,6 +631,19 @@ function render(focusTarget?: string): void {
       nextFocus.setSelectionRange(selectionStart, selectionEnd);
     }
   }
+
+  root.querySelector<HTMLButtonElement>(".reload-itinerary")?.addEventListener("click", () => {
+    void itineraryStore.load();
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-save-activity], [data-remove-activity]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const saveId = button.dataset.saveActivity;
+      if (saveId) await itineraryStore.add(saveId);
+      else if (button.dataset.removeActivity) await itineraryStore.remove(button.dataset.removeActivity);
+      render(saveId ? "recommendation-skill" : "page-dashboard");
+      announce(itineraryStore.getState().message ?? "Itinerary updated.");
+    });
+  });
 
   const searchInput = root.querySelector<HTMLInputElement>("#course-search");
   searchInput?.addEventListener("input", () => {
@@ -713,6 +731,8 @@ function render(focusTarget?: string): void {
   });
 }
 
+itineraryStore.subscribe(() => render());
+void itineraryStore.load();
 courseSelectionStore.subscribe(() => render("course-search"));
 careerGoalStore.subscribe(() => render());
 demoSessionStore.subscribe(() => render());

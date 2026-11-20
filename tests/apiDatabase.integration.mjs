@@ -81,6 +81,22 @@ test("course API persists selections and validates database operations", async (
     });
     assert.equal(invalidCourseResponse.status, 400);
 
+    const recommendationIds = [
+      "elective:java:ITCS 2214",
+      "project:java:practice",
+      "resource:java:Java Tutorials",
+    ];
+    for (const recommendationId of recommendationIds) {
+      const saveActivity = () => fetch(`${baseUrl}/api/itinerary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recommendationId }),
+      });
+      assert.equal((await saveActivity()).status, 200);
+      assert.equal((await saveActivity()).status, 200);
+    }
+    assert.equal(await prisma.itineraryActivity.count({ where: { studentId } }), 3);
+
     await stopServer();
     await startServer();
 
@@ -90,6 +106,15 @@ test("course API persists selections and validates database operations", async (
       (await restoredResponse.json()).map((course) => course.id),
       [courseId],
     );
+
+    const restoredActivities = await (await fetch(`${baseUrl}/api/itinerary`)).json();
+    assert.deepEqual(restoredActivities.map((activity) => activity.id).sort(), [...recommendationIds].sort());
+    assert.ok(restoredActivities.every((activity) => activity.title && activity.type && activity.skillId && activity.url));
+    for (const recommendationId of recommendationIds) {
+      const removal = await fetch(`${baseUrl}/api/itinerary/${encodeURIComponent(recommendationId)}`, { method: "DELETE" });
+      assert.equal(removal.status, 200);
+    }
+    assert.deepEqual(await (await fetch(`${baseUrl}/api/itinerary`)).json(), []);
 
     const removeResponse = await fetch(
       `${baseUrl}/api/courses/completed/${encodeURIComponent(courseId)}`,

@@ -36,6 +36,15 @@ export function createApiServer({
     }));
   }
 
+  async function getItinerary() {
+    const activities = await prismaClient.itineraryActivity.findMany({
+      where: { studentId },
+      include: { recommendation: true },
+      orderBy: [{ createdAt: "asc" }, { recommendationId: "asc" }],
+    });
+    return activities.map(({ recommendation }) => recommendation);
+  }
+
   return createServer(async (request, response) => {
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
@@ -49,6 +58,41 @@ export function createApiServer({
 
     try {
       const url = new URL(request.url, `http://${request.headers.host}`);
+      if (url.pathname === "/api/itinerary" && request.method === "GET") {
+        sendJson(response, 200, await getItinerary());
+        return;
+      }
+      if (url.pathname === "/api/itinerary" && request.method === "POST") {
+        const body = await readJson(request);
+        const recommendationId = body?.recommendationId;
+        if (typeof recommendationId !== "string" || !recommendationId) {
+          sendJson(response, 400, { error: "Choose a recommendation to save." });
+          return;
+        }
+        const recommendation = await prismaClient.recommendation.findUnique({
+          where: { id: recommendationId },
+        });
+        if (!recommendation) {
+          sendJson(response, 400, { error: "Recommendation unavailable. Refresh and choose another activity." });
+          return;
+        }
+        // Idempotent saves also handle retries after a lost response.
+        await prismaClient.itineraryActivity.upsert({
+          where: { studentId_recommendationId: { studentId, recommendationId } },
+          update: {},
+          create: { studentId, recommendationId },
+        });
+        sendJson(response, 200, await getItinerary());
+        return;
+      }
+      const itineraryMatch = url.pathname.match(/^\/api\/itinerary\/([^/]+)$/);
+      if (itineraryMatch && request.method === "DELETE") {
+        await prismaClient.itineraryActivity.deleteMany({
+          where: { studentId, recommendationId: decodeURIComponent(itineraryMatch[1]) },
+        });
+        sendJson(response, 200, await getItinerary());
+        return;
+      }
       if (url.pathname === "/api/courses/completed" && request.method === "GET") {
         sendJson(response, 200, await getSelections());
         return;
@@ -83,6 +127,10 @@ export function createApiServer({
 
       sendJson(response, 404, { error: "Not found." });
     } catch (error) {
+      if (error instanceof SyntaxError || error instanceof URIError) {
+        sendJson(response, 400, { error: "Invalid request. Refresh and try again." });
+        return;
+      }
       if (error?.code === "P2002") {
         sendJson(response, 409, { error: "That course is already selected." });
         return;

@@ -41,8 +41,37 @@ npm run test:db
 The test uses a temporary student and removes it during cleanup. Point
 `DATABASE_URL_TEST` at a test database, not a shared or production database.
 
-Latest verification: 34 unit tests pass across 8 files; the database API
-integration test passes; lint and the TypeScript/Vite production build pass.
+Issue #9 verification: 39 unit tests pass across 9 files; the itinerary HTTP
+adapter test, lint, and the TypeScript/Vite production build pass. The expanded
+PostgreSQL integration test requires a migrated, seeded test database.
+
+## Saved career itinerary (issue #9)
+
+Configure `DATABASE_URL` for your development database, then apply the new
+itinerary migration and seed the recommendations:
+
+```sh
+npm run db:generate
+npm run db:migrate:deploy
+npm run db:seed
+```
+
+Start the API and Vite as described above. Start the demo, choose a career goal,
+and open **Skill review**. Save a suggested course, project, or practice resource
+using **Save to itinerary**. Open **Dashboard** to see its name, type, skill,
+resource link, and **Remove** button. Saved activities reopen after refresh and
+returning to the dashboard, independently of changes to your goal or courses.
+Saving is immediate; **Save and continue** is not needed for itinerary activities.
+Failures show retry instructions and **Reload itinerary** when needed.
+
+The itinerary uses the API's existing fixed demo student. Storage is scoped by
+student ID on the server; authenticated account selection remains future work.
+Project suggestions are illustrative adapters while project recommendations are
+developed separately. Project links open supporting learning material.
+
+Run `npm run test:itinerary` for the HTTP tests with an in-memory database adapter.
+See [issue #9 review and verification](./docs/issue_details/issue-9-test-results.md)
+for acceptance coverage, database testing, and the manual review checklist.
 
 ## Usage
 
